@@ -29,8 +29,26 @@ const normalizerLog = createLogger('normalizer');
 const storageLog = createLogger('storage');
 const stateLog = createLogger('state');
 
-const db = await openDB();
+let db = null;
 const state = new LiveState();
+
+// Initialize DB — wrapped to avoid top-level await crash in some Chrome versions
+(async () => {
+  try {
+    db = await openDB();
+    log.info('IndexedDB opened successfully');
+  } catch (err) {
+    log.error('Failed to open IndexedDB', { error: err.message });
+  }
+})();
+
+function requireDB() {
+  if (!db) {
+    log.warn('IndexedDB not ready — skipping storage operation');
+    return false;
+  }
+  return true;
+}
 
 // --- Pipeline stats ---
 const stats = {
@@ -147,7 +165,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'getPolar') {
     const polarId = message.polarId ?? state.race?.polarId;
-    if (polarId == null) {
+    if (polarId == null || !db) {
       sendResponse({ polar: null });
       return true;
     }
@@ -158,6 +176,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'exportRace') {
+    if (!db) { sendResponse({ ok: false, error: 'DB not ready' }); return true; }
     exportRace(db, message.raceId)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
@@ -276,6 +295,7 @@ async function handleIntercepted(url, rawBody) {
   }
 
   try {
+    const canStore = requireDB();
     switch (type) {
       case 'boat': {
         const sd = data?.scriptData ?? data;
@@ -287,7 +307,7 @@ async function handleIntercepted(url, rawBody) {
             lat: normalized.lat,
             lon: normalized.lon,
           });
-          await saveBoatState(db, normalized);
+          if (canStore) await saveBoatState(db, normalized);
           stats.storageWrites++;
           storageLog.debug('Saved boat to IndexedDB');
           state.updateBoat(normalized);
@@ -306,7 +326,7 @@ async function handleIntercepted(url, rawBody) {
         const normalized = items.map(normalizeCompetitor).filter(Boolean);
         if (normalized.length > 0) {
           normalizerLog.debug(`Normalized fleet: ${normalized.length} competitors`);
-          await saveCompetitors(db, state.race?.raceId, Date.now(), normalized);
+          if (canStore) await saveCompetitors(db, state.race?.raceId, Date.now(), normalized);
           stats.storageWrites++;
           storageLog.debug('Saved fleet to IndexedDB');
           for (const comp of normalized) {
@@ -329,7 +349,7 @@ async function handleIntercepted(url, rawBody) {
         const normalized = normalizeRaceMeta(leg);
         if (normalized) {
           normalizerLog.debug(`Normalized race: ${normalized.name}`);
-          await saveRace(db, normalized);
+          if (canStore) await saveRace(db, normalized);
           stats.storageWrites++;
           storageLog.debug('Saved race to IndexedDB');
           state.race = normalized;
@@ -346,7 +366,7 @@ async function handleIntercepted(url, rawBody) {
         const normalized = normalizeAction(data);
         if (normalized) {
           normalizerLog.debug(`Normalized action: ${normalized.type}`);
-          await saveAction(db, normalized);
+          if (canStore) await saveAction(db, normalized);
           stats.storageWrites++;
           storageLog.debug('Saved action to IndexedDB');
         } else {
@@ -362,7 +382,7 @@ async function handleIntercepted(url, rawBody) {
         const normalized = normalizeWindSnapshot(data);
         if (normalized) {
           normalizerLog.debug('Normalized wind snapshot');
-          await saveWindSnapshot(db, normalized);
+          if (canStore) await saveWindSnapshot(db, normalized);
           stats.storageWrites++;
           storageLog.debug('Saved wind to IndexedDB');
         } else {
@@ -378,7 +398,7 @@ async function handleIntercepted(url, rawBody) {
         const normalized = normalizePolar(data);
         if (normalized) {
           normalizerLog.debug(`Normalized polar: ${normalized._id}`);
-          await savePolar(db, normalized);
+          if (canStore) await savePolar(db, normalized);
           stats.storageWrites++;
           storageLog.debug('Saved polar to IndexedDB');
         } else {
