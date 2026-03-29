@@ -4,11 +4,14 @@ const POLL_INTERVAL = 5000;
 const MAX_HISTORY = 200;
 const MAX_PERF_HISTORY = 720; // 1 hour at 5s intervals
 
+const MAX_INSHORE_TRACK = 200;
+
 export function createDataBridge(onUpdate) {
   let timer = null;
   const positionHistory = [];
   const perfHistory = [];
   const efficiencyHistory = [];
+  const inshoreTrackHistory = new Map(); // slot -> [{x,y}]
   let lastSnapshot = null;
 
   function poll() {
@@ -26,6 +29,24 @@ export function createDataBridge(onUpdate) {
             positionHistory.splice(0, positionHistory.length - MAX_HISTORY);
           }
         }
+      }
+
+      if (response.inshoreActive && response.inshoreBoats) {
+        for (const boat of response.inshoreBoats) {
+          let track = inshoreTrackHistory.get(boat.slot);
+          if (!track) {
+            track = [];
+            inshoreTrackHistory.set(boat.slot, track);
+          }
+          const last = track[track.length - 1];
+          if (!last || last.x !== boat.x || last.y !== boat.y) {
+            track.push({ x: boat.x, y: boat.y });
+            if (track.length > MAX_INSHORE_TRACK) {
+              track.splice(0, track.length - MAX_INSHORE_TRACK);
+            }
+          }
+        }
+        response._inshoreTrackHistory = Object.fromEntries(inshoreTrackHistory);
       }
 
       lastSnapshot = response;

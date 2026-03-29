@@ -5,6 +5,8 @@ const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 const TILE_ATTR = '&copy; <a href="https://carto.com/">CARTO</a>';
 const BOAT_COLOR = '#3a86ff';
 const TRACK_COLOR = '#00b4d8';
+const INSHORE_PLAYER_COLOR = '#3a86ff';
+const INSHORE_OTHER_COLOR = '#ff8c00';
 const COURSE_PROJECTION_NM = 50;
 const TWA_PROJECTION_NM = 30;
 
@@ -115,9 +117,87 @@ export function init2DMap(containerId) {
     }
   }
 
+  // --- Inshore overlay (CRS.Simple pixel coordinates) ---
+  let inshoreMap = null;
+  const inshoreMarkers = new Map(); // slot -> L.marker
+  const inshoreTrackLines = new Map(); // slot -> L.polyline
+
+  function getInshoreMap() {
+    if (inshoreMap) return inshoreMap;
+    inshoreMap = { _centered: false };
+    return inshoreMap;
+  }
+
+  function createInshoreIcon(heading, color) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+      <g transform="rotate(${heading}, 10, 10)">
+        <polygon points="10,2 5,17 10,13 15,17" fill="${color}" stroke="#fff" stroke-width="1" opacity="0.9"/>
+      </g>
+    </svg>`;
+    return L.divIcon({
+      html: svg,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+      className: '',
+    });
+  }
+
+  function updateInshore(snapshot) {
+    if (!snapshot || !snapshot.inshoreActive || !snapshot.inshoreBoats) return;
+
+    getInshoreMap();
+
+    const trackHistory = snapshot._inshoreTrackHistory || {};
+
+    for (let i = 0; i < snapshot.inshoreBoats.length; i++) {
+      const boat = snapshot.inshoreBoats[i];
+      const color = i === 0 ? INSHORE_PLAYER_COLOR : INSHORE_OTHER_COLOR;
+      // Use y as lat, x as lng for CRS.Simple-style plotting
+      // Negate y so that increasing y goes "up" on the map
+      const pos = [-boat.y, boat.x];
+
+      let marker = inshoreMarkers.get(boat.slot);
+      if (!marker) {
+        marker = L.marker(pos, { icon: createInshoreIcon(boat.heading, color) }).addTo(map);
+        inshoreMarkers.set(boat.slot, marker);
+      } else {
+        marker.setLatLng(pos);
+        marker.setIcon(createInshoreIcon(boat.heading, color));
+      }
+
+      // Draw track lines
+      const slotTrack = trackHistory[boat.slot];
+      if (slotTrack && slotTrack.length > 1) {
+        const latLngs = slotTrack.map(p => [-p.y, p.x]);
+        let line = inshoreTrackLines.get(boat.slot);
+        if (!line) {
+          line = L.polyline(latLngs, {
+            color,
+            opacity: 0.5,
+            weight: 1.5,
+          }).addTo(map);
+          inshoreTrackLines.set(boat.slot, line);
+        } else {
+          line.setLatLngs(latLngs);
+        }
+      }
+    }
+
+    // On first Inshore update with valid positions, center the map
+    if (snapshot.inshoreBoats.length > 0) {
+      const first = snapshot.inshoreBoats[0];
+      if (first.x !== 0 || first.y !== 0) {
+        if (!inshoreMap._centered) {
+          map.setView([-first.y, first.x], 2);
+          inshoreMap._centered = true;
+        }
+      }
+    }
+  }
+
   function resize() {
     map.invalidateSize();
   }
 
-  return { update, resize, getLeafletMap() { return map; } };
+  return { update, updateInshore, resize, getLeafletMap() { return map; } };
 }

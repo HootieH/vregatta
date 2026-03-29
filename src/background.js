@@ -19,6 +19,9 @@ import {
   exportRace,
 } from './storage/idb.js';
 import { LiveState } from './state/live-state.js';
+import { decompressStateAsync } from './colyseus/decoder.js';
+import { decodeState } from './colyseus/state-decoder.js';
+import { normalizeInshoreState } from './colyseus/inshore-pipeline.js';
 import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } from './telemetry.js';
 
 const log = createLogger('background');
@@ -454,9 +457,22 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
       break;
 
     case 'ws-state':
-      wsLog.debug(`WS state update (size=${data?.size ?? '?'})`, { direction });
-      // State decompression + decode is expensive; only do it at DEBUG level.
-      // Full decode happens in the dashboard/analysis layer.
+      if (data?.base64) {
+        try {
+          const raw = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
+          const payload = raw.slice(2); // strip 0xf3 + type byte
+          const decompressed = await decompressStateAsync(payload);
+          const decoded_state = decodeState(decompressed);
+          const normalized = normalizeInshoreState(decoded_state);
+          state.updateInshore(normalized);
+          const myBoat = normalized.boats[0];
+          wsLog.info(`Inshore: ${normalized.boats.length} boats, tick=${normalized.tick}, my heading=${myBoat?.heading ?? '?'}°`);
+        } catch (err) {
+          wsLog.error(`Inshore state decode failed (size=${data?.size ?? '?'}): ${err.message}`);
+        }
+      } else {
+        wsLog.debug(`WS state update (size=${data?.size ?? '?'}) — no base64 data`, { direction });
+      }
       break;
 
     case 'ws-data':

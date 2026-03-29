@@ -8,6 +8,8 @@ export class LiveState {
     this.competitors = new Map();
     this.history = [];
     this.events = [];
+    this.inshoreBoats = new Map();
+    this.inshoreTick = 0;
   }
 
   updateBoat(newState) {
@@ -93,6 +95,25 @@ export class LiveState {
     return meters / 1852; // convert to nautical miles
   }
 
+  updateInshore(normalizedState) {
+    if (!normalizedState || !normalizedState.boats) {
+      return { changed: false };
+    }
+
+    let changed = false;
+    this.inshoreTick = normalizedState.tick;
+
+    for (const boat of normalizedState.boats) {
+      const prev = this.inshoreBoats.get(boat.slot);
+      if (!prev || prev.heading !== boat.heading || prev.x !== boat.x || prev.y !== boat.y) {
+        changed = true;
+      }
+      this.inshoreBoats.set(boat.slot, boat);
+    }
+
+    return { changed };
+  }
+
   getSnapshot() {
     return {
       boat: this.boat,
@@ -101,6 +122,9 @@ export class LiveState {
       vmg: this.computeVMG(this.boat),
       events: this.events.slice(-5),
       connected: this.boat !== null,
+      inshoreBoats: Array.from(this.inshoreBoats.values()),
+      inshoreTick: this.inshoreTick,
+      inshoreActive: this.inshoreBoats.size > 0,
     };
   }
 }

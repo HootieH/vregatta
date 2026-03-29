@@ -33,6 +33,7 @@ const sharedOptions = {
   target: 'chrome120',
   sourcemap: true,
   plugins: [copyStaticFiles],
+  external: ['zlib'], // Node-only import in colyseus/decoder.js, guarded by typeof require check
 };
 
 // Background and popup use ESM
