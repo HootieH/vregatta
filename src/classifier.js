@@ -63,17 +63,28 @@ export function classify(url, body) {
 }
 
 /**
- * Classifies a WebSocket message. Since we don't yet know the Inshore protocol,
- * this attempts basic heuristic detection and falls back to 'ws-unknown'.
+ * Classifies a WebSocket message using the Colyseus protocol decoder.
+ *
+ * Binary messages starting with 0xf3 are decoded by type:
+ *   0x04 -> ws-state    (ROOM_STATE — compressed game state)
+ *   0x06 -> ws-helm-input (ROOM_DATA_SCHEMA — outgoing helm command)
+ *   0x07 -> ws-ack      (ROOM_DATA_BYTES — server acknowledgement)
+ *   0x03 -> ws-data     (ROOM_DATA — session/token data)
+ *   0x02 -> ws-leave    (LEAVE_ROOM)
+ *
  * @param {string} url - The WebSocket URL
  * @param {object} data - Described message data from injected.js
  * @param {string} direction - 'incoming' or 'outgoing'
- * @returns {{type: string, wsType: string|null, data: object}}
+ * @returns {{type: string, wsType: string|null, data: object, meta?: object, decoded?: object}}
  */
 export function classify_ws(url, data, direction) {
   if (!data) return { type: 'ws-unknown', wsType: null, data };
 
-  // Binary messages — likely Colyseus/MessagePack protocol
+  // Binary messages — decode Colyseus protocol
+  if (data.binary && data.base64) {
+    return classifyBinaryWs(data, direction);
+  }
+
   if (data.binary) {
     return {
       type: 'ws-unknown',
@@ -119,4 +130,69 @@ export function classify_ws(url, data, direction) {
   }
 
   return { type: 'ws-unknown', wsType: null, data };
+}
+
+/**
+ * Decodes a binary Colyseus message and classifies it by protocol type.
+ * @param {object} data - Binary message data with base64 field
+ * @param {string} direction - 'incoming' or 'outgoing'
+ * @returns {{type: string, wsType: string, data: object, meta?: object, decoded?: object}}
+ */
+function classifyBinaryWs(data, direction) {
+  let bytes;
+  try {
+    // Decode base64 to bytes
+    if (typeof atob === 'function') {
+      const binary = atob(data.base64);
+      bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    } else if (typeof Buffer !== 'undefined') {
+      // Node.js (test environment)
+      bytes = new Uint8Array(Buffer.from(data.base64, 'base64'));
+    } else {
+      return { type: 'ws-unknown', wsType: 'binary', data, meta: { size: data.size, firstBytes: data.firstBytes || null } };
+    }
+  } catch {
+    return { type: 'ws-unknown', wsType: 'binary', data, meta: { size: data.size, firstBytes: data.firstBytes || null } };
+  }
+
+  if (bytes.length < 2 || bytes[0] !== 0xf3) {
+    return { type: 'ws-unknown', wsType: 'binary', data, meta: { size: data.size, firstBytes: data.firstBytes || null } };
+  }
+
+  const typeByte = bytes[1];
+  const payload = bytes.slice(2);
+
+  const TYPE_MAP = {
+    0x04: 'ws-state',
+    0x06: 'ws-helm-input',
+    0x07: 'ws-ack',
+    0x03: 'ws-data',
+    0x02: 'ws-leave',
+  };
+
+  const type = TYPE_MAP[typeByte] || 'ws-unknown';
+  const meta = { size: data.size, firstBytes: data.firstBytes || null, typeByte };
+
+  // Attempt to decode known types
+  let decoded = null;
+  try {
+    if (typeByte === 0x06 && payload.length >= 7) {
+      // Helm input — decode heading from last 2 bytes
+      const off = payload.length - 2;
+      const raw = (payload[off] << 8) | payload[off + 1];
+      const heading = Math.round((raw * 360 / 65536) * 100) / 100;
+      decoded = { heading, raw };
+    } else if (typeByte === 0x07 && payload.length >= 16) {
+      // Server ack — heading at offset 10-11, timestamp at 14-17
+      const headingRaw = (payload[10] << 8) | payload[10 + 1];
+      const heading = Math.round((headingRaw * 360 / 65536) * 100) / 100;
+      const timestamp = ((payload[14] << 24) >>> 0) + (payload[15] << 16) + (payload[16] << 8) + payload[17];
+      decoded = { heading, headingRaw, timestamp };
+    }
+  } catch {
+    // Best-effort decode — failure is OK
+  }
+
+  return { type, wsType: 'binary', data, meta, decoded, direction };
 }

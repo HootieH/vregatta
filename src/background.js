@@ -432,17 +432,49 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
   stats.wsMessagesTotal++;
   recordMessage();
 
-  const { type, wsType } = classify_ws(url, data, direction);
+  const result = classify_ws(url, data, direction);
+  const { type, wsType, decoded } = result;
 
-  stats.wsClassifiedCounts[wsType || 'null'] = (stats.wsClassifiedCounts[wsType || 'null'] || 0) + 1;
+  // Track by classified type (ws-state, ws-helm-input, ws-ack, etc.)
+  stats.wsClassifiedCounts[type] = (stats.wsClassifiedCounts[type] || 0) + 1;
 
-  if (type === 'ws-unknown') {
-    wsLog.warn(`WS ${direction}: unknown (${wsType || 'empty'}, size=${data?.size ?? '?'})`, {
-      url,
-      wsType,
-      direction,
-    });
-    autoEnableRawCapture('Inshore WebSocket traffic detected — capturing for analysis');
+  switch (type) {
+    case 'ws-helm-input':
+      if (decoded && decoded.heading !== undefined) {
+        wsLog.info(`Decoded heading: ${decoded.heading}\u00b0 (raw=${decoded.raw})`, { direction });
+      } else {
+        wsLog.debug(`WS helm input (size=${data?.size ?? '?'}) — could not decode heading`, { direction });
+      }
+      break;
+
+    case 'ws-ack':
+      if (decoded) {
+        wsLog.debug(`WS ack: heading=${decoded.heading}\u00b0 tick=${decoded.timestamp}`, { direction });
+      }
+      break;
+
+    case 'ws-state':
+      wsLog.debug(`WS state update (size=${data?.size ?? '?'})`, { direction });
+      // State decompression + decode is expensive; only do it at DEBUG level.
+      // Full decode happens in the dashboard/analysis layer.
+      break;
+
+    case 'ws-data':
+      wsLog.debug(`WS room data (size=${data?.size ?? '?'})`, { direction });
+      break;
+
+    case 'ws-leave':
+      wsLog.info('WS leave room', { direction });
+      break;
+
+    default:
+      wsLog.warn(`WS ${direction}: unknown (${wsType || 'empty'}, size=${data?.size ?? '?'})`, {
+        url,
+        wsType,
+        direction,
+      });
+      autoEnableRawCapture('Inshore WebSocket traffic detected — capturing for analysis');
+      break;
   }
 
   // Always save WS messages to raw capture for offline analysis
@@ -451,12 +483,14 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
       url,
       direction,
       wsType,
+      type,
       data,
+      decoded: decoded || null,
       timestamp: timestamp || Date.now(),
       source: 'websocket',
     };
-    const result = await chrome.storage.local.get('vregatta-raw-capture');
-    const entries = result['vregatta-raw-capture'] || [];
+    const captureResult = await chrome.storage.local.get('vregatta-raw-capture');
+    const entries = captureResult['vregatta-raw-capture'] || [];
     entries.push(entry);
     while (entries.length > 200) {
       entries.shift();
