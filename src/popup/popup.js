@@ -130,6 +130,8 @@ function updateUI(snapshot) {
   statusEl.className = 'connected';
   document.getElementById('export-btn').disabled = false;
 
+  // Game mode annotation is updated by fetchDebugStats via the stats endpoint
+
   populateRace(snapshot.race);
   populateBoatData(snapshot.boat);
   populateVMG(snapshot.vmg);
@@ -199,6 +201,22 @@ function fetchDebugStats() {
     setText('dbg-intercepted', String(response.totalIntercepted));
     setText('dbg-classified-ok', String(okCount));
     setText('dbg-fail-total', String(failTotal));
+
+    // Game mode detection
+    const gameMode = response.gameMode || 'none';
+    const statusEl = document.getElementById('connection-status');
+    if (statusEl && statusEl.className === 'connected') {
+      if (gameMode === 'both') statusEl.textContent = 'Connected (Offshore + Inshore)';
+      else if (gameMode === 'offshore') statusEl.textContent = 'Connected (Offshore)';
+      else if (gameMode === 'inshore') statusEl.textContent = 'Connected (Inshore)';
+    }
+
+    // WebSocket stats
+    const wsTotal = response.wsMessagesTotal || 0;
+    setText('dbg-ws-total', String(wsTotal));
+    const wsCounts = response.wsClassifiedCounts || {};
+    const wsDetail = Object.entries(wsCounts).map(([k, v]) => `${k}:${v}`).join(', ');
+    setText('dbg-ws-detail', wsTotal > 0 ? `(${wsDetail || 'all unknown'})` : '');
 
     // Pipeline stats
     setText('dbg-storage-writes', String(response.storageWrites));

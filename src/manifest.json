@@ -10,7 +10,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://play.offshore.virtualregatta.com/*"],
+      "matches": [
+        "*://play.offshore.virtualregatta.com/*",
+        "*://play.inshore.virtualregatta.com/*"
+      ],
       "js": ["content.js"],
       "all_frames": true,
       "run_at": "document_start"
@@ -25,7 +28,10 @@
   "web_accessible_resources": [
     {
       "resources": ["injected.js"],
-      "matches": ["*://play.offshore.virtualregatta.com/*"]
+      "matches": [
+        "*://play.offshore.virtualregatta.com/*",
+        "*://play.inshore.virtualregatta.com/*"
+      ]
     },
     {
       "resources": ["dashboard/dashboard.html", "dashboard/dashboard.js", "dashboard/dashboard.css", "dashboard/leaflet.css"],

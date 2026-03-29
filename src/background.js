@@ -1,4 +1,4 @@
-import { classify } from './classifier.js';
+import { classify, classify_ws } from './classifier.js';
 import {
   normalizeBoatState,
   normalizeCompetitor,
@@ -23,6 +23,7 @@ import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } 
 
 const log = createLogger('background');
 const interceptorLog = createLogger('interceptor');
+const wsLog = createLogger('ws-interceptor');
 const classifierLog = createLogger('classifier');
 const normalizerLog = createLogger('normalizer');
 const storageLog = createLogger('storage');
@@ -39,7 +40,13 @@ const stats = {
   storageWrites: 0,
   unknownCount: 0,
   pipelineErrors: 0,
+  wsMessagesTotal: 0,
+  wsClassifiedCounts: {},
 };
+
+// --- Game mode detection ---
+let detectedOffshore = false;
+let detectedInshore = false;
 
 // --- Messages-per-second tracking ---
 const recentTimestamps = [];
@@ -112,7 +119,14 @@ async function getRawCaptureCount() {
 // --- Message handlers ---
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'intercepted') {
+    detectedOffshore = true;
     handleIntercepted(message.url, message.body);
+    return false;
+  }
+
+  if (message.type === 'ws-intercepted') {
+    detectedInshore = true;
+    handleWsIntercepted(message.url, message.data, message.direction, message.timestamp);
     return false;
   }
 
@@ -152,6 +166,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'getStats') {
     getRawCaptureCount().then((rawCaptureCount) => {
+      let gameMode = 'none';
+      if (detectedOffshore && detectedInshore) gameMode = 'both';
+      else if (detectedOffshore) gameMode = 'offshore';
+      else if (detectedInshore) gameMode = 'inshore';
+
       sendResponse({
         totalIntercepted: stats.totalIntercepted,
         classifiedCounts: { ...stats.classifiedCounts },
@@ -163,6 +182,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         rawCaptureEnabled,
         logLevel: getLogLevel(),
         messagesPerSecond: getMessagesPerSecond(),
+        wsMessagesTotal: stats.wsMessagesTotal,
+        wsClassifiedCounts: { ...stats.wsClassifiedCounts },
+        gameMode,
       });
     });
     return true;
@@ -383,6 +405,47 @@ async function handleIntercepted(url, rawBody) {
   }
 
   // Update badge on every message to keep the green count fresh
+  updateBadge();
+}
+
+async function handleWsIntercepted(url, data, direction, timestamp) {
+  stats.wsMessagesTotal++;
+  recordMessage();
+
+  const { type, wsType } = classify_ws(url, data, direction);
+
+  stats.wsClassifiedCounts[wsType || 'null'] = (stats.wsClassifiedCounts[wsType || 'null'] || 0) + 1;
+
+  if (type === 'ws-unknown') {
+    wsLog.warn(`WS ${direction}: unknown (${wsType || 'empty'}, size=${data?.size ?? '?'})`, {
+      url,
+      wsType,
+      direction,
+    });
+    autoEnableRawCapture('Inshore WebSocket traffic detected — capturing for analysis');
+  }
+
+  // Always save WS messages to raw capture for offline analysis
+  try {
+    const entry = {
+      url,
+      direction,
+      wsType,
+      data,
+      timestamp: timestamp || Date.now(),
+      source: 'websocket',
+    };
+    const result = await chrome.storage.local.get('vregatta-raw-capture');
+    const entries = result['vregatta-raw-capture'] || [];
+    entries.push(entry);
+    while (entries.length > 200) {
+      entries.shift();
+    }
+    await chrome.storage.local.set({ 'vregatta-raw-capture': entries });
+  } catch (err) {
+    wsLog.error('Failed to save WS raw capture', { error: err.message });
+  }
+
   updateBadge();
 }
 
