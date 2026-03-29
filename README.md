@@ -5,7 +5,8 @@ Virtual Regatta sailing companion — captures live race data and gives you anal
 ## Quickstart (60 seconds)
 
 ```bash
-git clone <repo-url> && cd virtual-regatta-tools
+git clone https://github.com/HootieH/vregatta.git
+cd vregatta
 ./setup.sh
 ```
 
