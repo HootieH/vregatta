@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vRegatta Dashboard</title>
+  <link rel="stylesheet" href="leaflet.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div id="panel-tabs">
+    <button class="panel-tab active" data-panel="map-2d">Map</button>
+    <button class="panel-tab active" data-panel="globe-3d">Globe</button>
+    <button class="panel-tab" data-panel="polar-chart">Polar</button>
+    <button class="panel-tab" data-panel="perf-chart">Perf</button>
+    <button id="wind-toggle" class="panel-tab active" title="Toggle wind overlay">Wind</button>
+    <button id="route-toggle" class="panel-tab" title="Toggle route advisor">Route</button>
+    <button id="help-btn" class="panel-tab" title="Help &amp; Instructions">?</button>
+  </div>
+  <div id="panels">
+    <div id="map-2d" class="panel">
+      <div id="compass-rose"></div>
+    </div>
+    <div id="splitter"></div>
+    <div id="globe-3d" class="panel"></div>
+    <div id="polar-chart" class="panel" style="display:none;"></div>
+    <div id="perf-chart" class="panel" style="display:none;">
+      <div id="perf-history"></div>
+    </div>
+  </div>
+  <div id="route-panel"></div>
+  <div id="hud"></div>
+  <div id="wind-strip-section">
+    <button id="wind-strip-toggle" class="wind-strip-toggle-btn">Wind History &#9660;</button>
+    <div id="wind-strip" class="wind-strip-container"></div>
+  </div>
+  <script src="dashboard.js" type="module"></script>
+</body>
+</html>

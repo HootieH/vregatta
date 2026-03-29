@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>vRegatta</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="connection-status" class="disconnected">Not connected</div>
+
+  <section id="race-info" class="section hidden">
+    <div class="section-label">Race</div>
+    <div id="race-name">—</div>
+  </section>
+
+  <section id="boat-data" class="section hidden">
+    <div class="section-label">Boat</div>
+    <div class="data-grid">
+      <div class="data-cell">
+        <span class="label">Lat</span>
+        <span class="value" id="boat-lat">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">Lon</span>
+        <span class="value" id="boat-lon">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">Speed</span>
+        <span class="value" id="boat-speed">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">Heading</span>
+        <span class="value" id="boat-heading">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">TWA</span>
+        <span class="value" id="boat-twa">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">TWS</span>
+        <span class="value" id="boat-tws">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">TWD</span>
+        <span class="value" id="boat-twd">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">Sail</span>
+        <span class="value" id="boat-sail">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">Stamina</span>
+        <span class="value" id="boat-stamina">—</span>
+      </div>
+      <div class="data-cell">
+        <span class="label">DTF</span>
+        <span class="value" id="boat-dtf">—</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="vmg-section" class="section hidden">
+    <div class="section-label">VMG</div>
+    <div class="vmg-display">
+      <span id="vmg-value" class="vmg-number">—</span>
+      <span id="vmg-component" class="vmg-component"></span>
+    </div>
+  </section>
+
+  <section id="rank-section" class="section hidden">
+    <div class="section-label">Fleet</div>
+    <div id="competitor-count">—</div>
+  </section>
+
+  <section id="actions-section" class="section hidden">
+    <div class="section-label">Recent Actions</div>
+    <ul id="actions-list"></ul>
+  </section>
+
+  <section id="controls" class="section">
+    <button id="dashboard-btn">Open Dashboard</button>
+    <button id="export-btn" disabled>Export Race Data</button>
+    <a href="help.html" target="_blank" class="help-link">Help &amp; Instructions</a>
+  </section>
+
+  <section id="debug-section" class="section">
+    <div class="section-label">Debug</div>
+
+    <!-- Error alert — red box, shown only when failures exist -->
+    <div id="dbg-error-alert" class="dbg-error-alert hidden">
+      <div class="dbg-error-title">Pipeline Failures</div>
+      <div class="dbg-error-counts">
+        <span><span id="dbg-unknown-count" class="dbg-error-num">0</span> unknown</span>
+        <span><span id="dbg-norm-fail-count" class="dbg-error-num">0</span> norm fails</span>
+        <span><span id="dbg-pipe-error-count" class="dbg-error-num">0</span> errors</span>
+      </div>
+    </div>
+
+    <!-- Summary line -->
+    <div id="dbg-summary" class="dbg-summary">
+      <span><span id="dbg-intercepted">0</span> intercepted</span>
+      <span class="dbg-ok"><span id="dbg-classified-ok">0</span> OK</span>
+      <span class="dbg-fail"><span id="dbg-fail-total">0</span> FAILED</span>
+    </div>
+
+    <div class="debug-stats">
+      <div class="data-grid">
+        <div class="data-cell">
+          <span class="label">Storage writes</span>
+          <span class="value" id="dbg-storage-writes">0</span>
+        </div>
+        <div class="data-cell">
+          <span class="label">Raw captured</span>
+          <span class="value" id="dbg-raw-count">0</span>
+        </div>
+      </div>
+    </div>
+    <div class="debug-controls">
+      <button id="debug-overlay-btn" class="debug-btn">Toggle Debug Overlay</button>
+      <button id="raw-capture-btn" class="debug-btn">Enable Raw Capture</button>
+      <button id="download-raw-btn" class="debug-btn" disabled>Download Raw Capture</button>
+    </div>
+  </section>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

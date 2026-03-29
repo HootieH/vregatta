@@ -1,0 +1,28 @@
+{
+  "name": "vregatta",
+  "version": "1.0.0",
+  "description": "Virtual Regatta sailing tools suite",
+  "main": "index.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "esbuild": "^0.27.4",
+    "eslint": "^10.1.0",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.0.1",
+    "vitest": "^4.1.2"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "three": "^0.183.2"
+  }
+}

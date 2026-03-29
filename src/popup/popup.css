@@ -1,0 +1,265 @@
+body {
+  width: 340px;
+  min-height: 200px;
+  margin: 0;
+  padding: 12px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+/* Connection status bar */
+#connection-status {
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  text-align: center;
+  font-size: 12px;
+}
+
+#connection-status.connected {
+  background: #2ecc71;
+  color: #1a1a2e;
+}
+
+#connection-status.disconnected {
+  background: #e74c3c;
+  color: #fff;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.section.hidden {
+  display: none;
+}
+
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #3a86ff;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+/* Race info */
+#race-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00b4d8;
+}
+
+/* Boat data grid */
+.data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.data-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.data-cell .label {
+  font-size: 11px;
+  color: #888;
+}
+
+.data-cell .value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+/* VMG display */
+.vmg-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.vmg-number {
+  font-size: 18px;
+  font-weight: bold;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.vmg-component {
+  font-size: 11px;
+  color: #888;
+}
+
+.vmg-green {
+  color: #2ecc71;
+}
+
+.vmg-yellow {
+  color: #f39c12;
+}
+
+.vmg-red {
+  color: #e74c3c;
+}
+
+/* Fleet / rank */
+#competitor-count {
+  font-size: 13px;
+}
+
+/* Actions list */
+#actions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#actions-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+#actions-list li:last-child {
+  border-bottom: none;
+}
+
+.action-type {
+  color: #00b4d8;
+}
+
+.action-time {
+  color: #666;
+  font-size: 11px;
+}
+
+/* Controls */
+#export-btn {
+  width: 100%;
+  padding: 8px;
+  background: #3a86ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#export-btn:hover:not(:disabled) {
+  background: #2a76ef;
+}
+
+#export-btn:disabled {
+  background: #333;
+  color: #666;
+  cursor: default;
+}
+
+/* Debug section */
+
+/* Error alert — red, top of debug section, impossible to miss */
+.dbg-error-alert {
+  background: rgba(231, 76, 60, 0.15);
+  border: 1px solid #e74c3c;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.dbg-error-alert.hidden {
+  display: none;
+}
+
+.dbg-error-title {
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.dbg-error-counts {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #e08080;
+}
+
+.dbg-error-num {
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+/* Summary line */
+.dbg-summary {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+
+.dbg-summary .dbg-ok {
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.dbg-summary .dbg-fail {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.debug-stats {
+  margin-bottom: 8px;
+}
+
+.debug-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.debug-btn {
+  width: 100%;
+  padding: 6px;
+  background: #2a2a4a;
+  color: #e0e0e0;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.debug-btn:hover {
+  background: #3a3a5a;
+}
+
+.debug-btn.active {
+  background: #3a86ff;
+  color: #fff;
+  border-color: #3a86ff;
+}
+
+.debug-btn:disabled {
+  background: #222;
+  color: #555;
+  cursor: default;
+}

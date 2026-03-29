@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>vRegatta Help</title>
+  <style>
+    html, body {
+      margin: 0;
+      background: #0a0a1a;
+      color: #e0e0e0;
+      font-family: monospace;
+      line-height: 1.6;
+    }
+    .help-wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+    }
+    h1 {
+      color: #3a86ff;
+      font-size: 20px;
+      margin: 0 0 20px;
+      border-bottom: 1px solid #2a2a4a;
+      padding-bottom: 8px;
+    }
+    h2 {
+      color: #00b4d8;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 24px 0 8px;
+      border-bottom: 1px solid #1a1a3a;
+      padding-bottom: 4px;
+    }
+    p, li {
+      font-size: 13px;
+      color: #ccc;
+    }
+    ul, ol {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 4px;
+    }
+    strong {
+      color: #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="help-wrap">
+    <h1>vRegatta Help</h1>
+
+    <h2>Welcome</h2>
+    <p>Welcome to vRegatta — your Virtual Regatta sailing companion. This tool captures live race data and gives you powerful analytics to improve your sailing.</p>
+
+    <h2>Getting Started</h2>
+    <ol>
+      <li>Open Virtual Regatta Offshore in Chrome</li>
+      <li>Start or join a race</li>
+      <li>vRegatta automatically captures data — look for the green badge on the extension icon</li>
+      <li>Click <strong>Open Dashboard</strong> in the popup to launch the full view</li>
+    </ol>
+
+    <h2>Dashboard Panels</h2>
+    <p>Use the tab bar to switch between views:</p>
+    <ul>
+      <li><strong>Map</strong> — 2D Leaflet map with boat track, competitors, wind arrows</li>
+      <li><strong>Globe</strong> — 3D view of your race on a globe</li>
+      <li><strong>Polar</strong> — Interactive polar chart showing boat speed at every angle</li>
+      <li><strong>Perf</strong> — Real-time performance analysis vs theoretical optimal</li>
+    </ul>
+
+    <h2>Wind Tools</h2>
+    <ul>
+      <li><strong>Compass Rose</strong> (top-right of map) — Shows current wind direction and speed</li>
+      <li><strong>Wind Arrows</strong> — Toggle wind overlay to see wind at your position</li>
+      <li><strong>Wind Strip</strong> (below HUD) — TWS/TWD history with wind shift detection</li>
+      <li><strong>Wind Shifts</strong> — Marked with arrows showing veering (clockwise) or backing (counter-clockwise)</li>
+    </ul>
+
+    <h2>Routing</h2>
+    <ul>
+      <li>Click the <strong>Route</strong> button to enable routing mode</li>
+      <li>Click anywhere on the map to set a waypoint</li>
+      <li>See recommended heading, sail, and VMG to waypoint</li>
+      <li><strong>Laylines</strong> show optimal tack/gybe angles (green=starboard, red=port)</li>
+      <li>Watch for <strong>TACK NOW / GYBE NOW</strong> alerts near laylines</li>
+    </ul>
+
+    <h2>Performance</h2>
+    <ul>
+      <li><strong>Efficiency Gauge</strong> — Your current VMG efficiency (0-100%)</li>
+      <li><strong>Speed Trace</strong> — Your actual speed vs theoretical optimal over time</li>
+      <li><strong>Sail Indicator</strong> — Warns you if you're on the wrong sail</li>
+      <li><strong>Session Stats</strong> — Average efficiency, tack/gybe scores, distance sailed</li>
+    </ul>
+
+    <h2>Polar Chart</h2>
+    <ul>
+      <li>Shows speed curves for all 7 sails at current wind speed</li>
+      <li><strong>White envelope</strong> = maximum speed at each angle</li>
+      <li><strong>Animated needle</strong> = your current TWA and speed</li>
+      <li><strong>BestVMG markers</strong> = optimal upwind/downwind angles</li>
+      <li>Use TWS buttons to see how polars change at different wind speeds</li>
+    </ul>
+
+    <h2>Debugging</h2>
+    <p>If something isn't working:</p>
+    <ul>
+      <li>Check the <strong>Debug</strong> section in the popup for pipeline stats</li>
+      <li>Red badge on icon = pipeline failures (click to inspect)</li>
+      <li>Raw capture auto-enables on failures — download captured data for analysis</li>
+      <li>The debug overlay on the game page shows live message flow</li>
+    </ul>
+  </div>
+</body>
+</html>
