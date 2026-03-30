@@ -13,6 +13,7 @@ const EVENT_CONFIG = {
   mark: { label: 'Mark', dotClass: 'mark' },
   penalty: { label: 'Penalty', dotClass: 'penalty' },
   rule: { label: 'Rule', dotClass: 'rule' },
+  windShift: { label: 'Wind Shift', dotClass: 'wind-shift' },
 };
 
 function formatTime(ts) {
@@ -79,6 +80,10 @@ export function initInshoreEvents(containerId) {
         let detail = '';
         if (evt.type === 'penalty') detail = 'Maneuver penalty';
         if (evt.type === 'sailChange') detail = `${evt.from} -> ${evt.to}`;
+        if (evt.type === 'windShift') {
+          const dir = evt.direction === 'veering' ? 'Veered' : 'Backed';
+          detail = `${dir} ${evt.magnitude?.toFixed(0) ?? '?'}\u00b0 (${evt.fromDir?.toFixed(0) ?? '?'}\u00b0\u2192${evt.toDir?.toFixed(0) ?? '?'}\u00b0)`;
+        }
         addEvent(evt.type, detail, evt.timestamp);
       }
     }

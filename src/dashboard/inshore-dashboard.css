@@ -354,6 +354,9 @@ html, body {
 .event-dot.mark { background: #00e676; }
 .event-dot.penalty { background: #ff3333; }
 .event-dot.rule { background: #a855f7; }
+.event-dot.wind-shift { background: #00b4d8; }
+
+.twd-shifting { color: #ffbf00 !important; }
 
 .event-text {
   color: #ccc;

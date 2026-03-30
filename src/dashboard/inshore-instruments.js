@@ -143,15 +143,36 @@ export function initInshoreInstruments(containerId) {
       twa.value.className = 'instr-value';
     }
 
-    // TWD
+    // TWD — with wind shift trend indicator
     const twd = cells.twd;
     if (snapshot.inshoreWindDirection != null) {
       const wd = Math.round(snapshot.inshoreWindDirection);
       twd.value.textContent = `${String(wd).padStart(3, '0')}`;
-      twd.sub.textContent = compassLabel(wd);
+
+      // Show wind trend from history
+      const wh = snapshot.inshoreWindHistory;
+      if (wh && wh.length >= 10) {
+        const recent = wh[wh.length - 1].direction;
+        const older = wh[Math.max(0, wh.length - 30)].direction;
+        let delta = recent - older;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+        if (Math.abs(delta) >= 2) {
+          const arrow = delta > 0 ? '\u2191' : '\u2193'; // ↑ veering, ↓ backing
+          twd.sub.textContent = `${compassLabel(wd)} ${arrow}${Math.abs(delta).toFixed(0)}\u00b0`;
+          twd.value.className = 'instr-value twd-shifting';
+        } else {
+          twd.sub.textContent = compassLabel(wd) + ' steady';
+          twd.value.className = 'instr-value';
+        }
+      } else {
+        twd.sub.textContent = compassLabel(wd);
+        twd.value.className = 'instr-value';
+      }
     } else {
       twd.value.textContent = '---';
       twd.sub.textContent = '';
+      twd.value.className = 'instr-value';
     }
 
     // POS (Point of Sail)

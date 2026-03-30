@@ -2,6 +2,7 @@ import { FleetAccumulator } from '../colyseus/fleet-accumulator.js';
 
 const MAX_HISTORY = 20;
 const MAX_EVENTS = 50;
+const MAX_WIND_HISTORY = 600; // ~5 min at 2/sec sample rate
 
 export class LiveState {
   constructor() {
@@ -13,6 +14,10 @@ export class LiveState {
     this.inshoreBoats = new Map();
     this.inshoreTick = 0;
     this.fleetAccumulator = new FleetAccumulator();
+    // Wind tracking for shift detection
+    this.inshoreWindHistory = []; // [{tick, direction, speed, timestamp}]
+    this.inshoreWindShifts = [];  // [{tick, fromDir, toDir, magnitude, direction: 'veering'|'backing', timestamp}]
+    this.lastWindSampleTick = 0;
   }
 
   updateBoat(newState) {
@@ -114,6 +119,49 @@ export class LiveState {
     if (normalizedState.windSpeed != null) {
       this.inshoreWindSpeed = normalizedState.windSpeed;
     }
+
+    // Wind history — sample every ~60 ticks (~0.5 sec) for shift detection
+    const tick = normalizedState.tick ?? 0;
+    if (normalizedState.windDirection != null && tick - this.lastWindSampleTick >= 60) {
+      this.lastWindSampleTick = tick;
+      const sample = {
+        tick,
+        direction: normalizedState.windDirection,
+        speed: normalizedState.windSpeed,
+        timestamp: normalizedState.timestamp ?? Date.now(),
+      };
+      this.inshoreWindHistory.push(sample);
+      if (this.inshoreWindHistory.length > MAX_WIND_HISTORY) {
+        this.inshoreWindHistory.shift();
+      }
+
+      // Detect wind shifts: compare current to 30 seconds ago (~60 samples back)
+      if (this.inshoreWindHistory.length >= 60) {
+        const old = this.inshoreWindHistory[this.inshoreWindHistory.length - 60];
+        let dirDelta = sample.direction - old.direction;
+        if (dirDelta > 180) dirDelta -= 360;
+        if (dirDelta < -180) dirDelta += 360;
+
+        if (Math.abs(dirDelta) >= 5) { // 5° threshold for a meaningful shift
+          const lastShift = this.inshoreWindShifts[this.inshoreWindShifts.length - 1];
+          // Avoid duplicate shift events within 30 seconds
+          if (!lastShift || tick - lastShift.tick > 3750) { // ~30 sec
+            const shift = {
+              tick,
+              fromDir: old.direction,
+              toDir: sample.direction,
+              magnitude: Math.abs(dirDelta),
+              direction: dirDelta > 0 ? 'veering' : 'backing', // clockwise = veering
+              timestamp: sample.timestamp,
+            };
+            this.inshoreWindShifts.push(shift);
+            if (this.inshoreWindShifts.length > 50) this.inshoreWindShifts.shift();
+            detectedEvents.push({ type: 'windShift', ...shift, source: 'inshore' });
+          }
+        }
+      }
+    }
+
     // Race info
     if (normalizedState.currentLap != null) {
       this.inshoreCurrentLap = normalizedState.currentLap;
@@ -192,6 +240,8 @@ export class LiveState {
       inshoreCurrentLap: this.inshoreCurrentLap ?? null,
       inshoreRaceTimerSeconds: this.inshoreRaceTimerSeconds ?? null,
       inshoreRaceId: this.inshoreRaceId ?? null,
+      inshoreWindHistory: this.inshoreWindHistory.slice(-120), // last ~60 sec for display
+      inshoreWindShifts: this.inshoreWindShifts.slice(-10),   // last 10 shifts
       // Fleet data is added by background.js from FleetManager
       inshoreFleet: [],
       inshoreFleetStats: { total: 0, inRace: 0, withPosition: 0, withName: 0 },
