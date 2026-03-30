@@ -22,10 +22,12 @@ export function init(containerId) {
     const cy = h / 2;
     const radius = Math.min(cx, cy) * 0.78;
 
-    const boat = snapshot?.boat;
-    const twa = boat?.twa;
-    const tws = boat?.tws;
-    const twd = boat?.twd;
+    // Use Inshore data when active, otherwise Offshore
+    const useInshore = snapshot?.inshoreActive && snapshot.inshorePlayerBoat;
+    const boat = useInshore ? null : snapshot?.boat;
+    const twa = useInshore ? snapshot.inshorePlayerBoat.twa : boat?.twa;
+    const tws = useInshore ? snapshot.inshoreWindSpeed : boat?.tws;
+    const twd = useInshore ? snapshot.inshoreWindDirection : boat?.twd;
 
     // Outer ring
     ctx.strokeStyle = '#222';
@@ -120,6 +122,14 @@ export function init(containerId) {
     ctx.fillStyle = arrowColor;
     ctx.font = `bold ${11 * dpr}px monospace`;
     ctx.fillText('TWA ' + Math.abs(twa).toFixed(0) + '\u00B0' + (twa < 0 ? 'P' : 'S'), cx, cy - radius - 10 * dpr);
+
+    // Tack label (port/starboard) for Inshore
+    if (useInshore && snapshot.inshorePlayerBoat.tack) {
+      const tackLabel = snapshot.inshorePlayerBoat.tack === 'starboard' ? 'STBD' : 'PORT';
+      ctx.fillStyle = twa < 0 ? '#ff3333' : '#00ff41';
+      ctx.font = `bold ${9 * dpr}px monospace`;
+      ctx.fillText(tackLabel, cx, cy - radius - 22 * dpr);
+    }
 
     // TWD text bottom
     if (twd != null) {

@@ -48,6 +48,32 @@ export function initHUD() {
   }
 
   function update(snapshot) {
+    // Inshore mode: show inshore sailing data
+    if (snapshot?.inshoreActive && snapshot.inshorePlayerBoat) {
+      const p = snapshot.inshorePlayerBoat;
+      const speedPct = ((p.speedRaw / 10000) * 100).toFixed(0);
+
+      if (elements.speed) elements.speed.textContent = speedPct + ' %';
+      if (elements.heading) elements.heading.textContent = Math.round(p.heading) + ' \u00B0';
+      if (elements.twa) {
+        const sign = p.twa >= 0 ? '+' : '';
+        elements.twa.textContent = sign + Math.round(p.twa) + ' \u00B0';
+      }
+      if (elements.tws) elements.tws.textContent = snapshot.inshoreWindSpeed != null ? snapshot.inshoreWindSpeed + ' kn' : '\u2014';
+      if (elements.sail) elements.sail.textContent = p.pointOfSail ?? '\u2014';
+      if (elements.vmg) {
+        if (p.vmg != null) {
+          elements.vmg.textContent = p.vmg.toFixed(2);
+          elements.vmg.className = 'hud-value vmg-green';
+        } else {
+          elements.vmg.textContent = '\u2014';
+        }
+      }
+      if (elements.stamina) elements.stamina.textContent = '\u2014';
+      if (elements.dtf) elements.dtf.textContent = p.raceProgress != null ? (p.raceProgress / 2).toFixed(0) + ' %' : '\u2014';
+      return;
+    }
+
     if (!snapshot || !snapshot.boat) {
       for (const el of Object.values(elements)) {
         el.textContent = '\u2014';

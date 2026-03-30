@@ -41,6 +41,35 @@ export function init(containerId) {
   }
 
   function update(snapshot) {
+    // Inshore mode: use inshore VMG
+    const useInshore = snapshot?.inshoreActive && snapshot.inshorePlayerBoat;
+
+    if (useInshore) {
+      const p = snapshot.inshorePlayerBoat;
+      if (p.vmg == null || p.twa == null) {
+        valueEl.textContent = '---';
+        valueEl.className = 'mfd-vmg-value mfd-dim';
+        indicatorEl.textContent = '---';
+        indicatorEl.className = 'mfd-vmg-indicator mfd-dim';
+        deltaEl.textContent = '';
+        drawGauge(0);
+        return;
+      }
+
+      const absVmg = Math.abs(p.vmg);
+      valueEl.textContent = absVmg.toFixed(3);
+      valueEl.className = 'mfd-vmg-value mfd-green';
+
+      const isUpwind = Math.abs(p.twa) < 90;
+      indicatorEl.textContent = isUpwind ? '\u25B2 UP' : '\u25BC DN';
+      indicatorEl.className = 'mfd-vmg-indicator ' + (isUpwind ? 'mfd-green' : 'mfd-amber');
+
+      deltaEl.textContent = p.pointOfSail ?? '';
+      deltaEl.className = 'mfd-vmg-delta mfd-dim';
+      drawGauge(absVmg * 100); // normalized speed VMG, rough gauge
+      return;
+    }
+
     const vmg = snapshot?.vmg;
 
     if (!vmg || vmg.vmg == null) {

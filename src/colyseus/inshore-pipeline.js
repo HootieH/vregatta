@@ -24,6 +24,35 @@
 /** Placeholder scale factor — will be calibrated once coordinate system is understood. */
 export const COORDINATE_SCALE = 1;
 
+/**
+ * Compute True Wind Angle from boat heading and wind direction.
+ * Positive = starboard tack, Negative = port tack.
+ * @param {number} heading - boat heading 0-360
+ * @param {number} windDirection - true wind direction 0-360
+ * @returns {number} TWA in range -180 to +180
+ */
+export function computeTWA(heading, windDirection) {
+  let twa = heading - windDirection;
+  while (twa > 180) twa -= 360;
+  while (twa < -180) twa += 360;
+  return twa;
+}
+
+/**
+ * Determine point of sail from absolute TWA.
+ * @param {number} absTwa - absolute TWA 0-180
+ * @returns {string}
+ */
+export function classifyPointOfSail(absTwa) {
+  if (absTwa < 30) return 'head-to-wind';
+  if (absTwa < 60) return 'close-hauled';
+  if (absTwa < 80) return 'close-reach';
+  if (absTwa < 100) return 'beam-reach';
+  if (absTwa < 140) return 'broad-reach';
+  if (absTwa < 170) return 'running';
+  return 'dead-downwind';
+}
+
 /** Speed scale: raw value ~10000 = full speed */
 export const SPEED_SCALE = 10000;
 
@@ -56,15 +85,37 @@ export function normalizeInshoreState(decodedState) {
     return { tick: 0, boats: [], windDirection: null, windSpeed: null, timestamp: Date.now() };
   }
 
+  const windDirection = decodedState.boats?.[0]?.targetHeading ?? null;
+  const windSpeed = decodedState.raw?.[6]?.[0] ?? null;
+
   const boats = [];
   for (let i = 0; i < decodedState.boats.length; i++) {
     const b = decodedState.boats[i];
     const rawSpeed = b.speed ?? 0;
     const speedNormalized = Math.min(rawSpeed / SPEED_SCALE, 1.5);
+    const heading = b.heading ?? 0;
+
+    // TWA and derived sailing metrics
+    let twa = null;
+    let tack = null;
+    let pointOfSail = null;
+    let vmg = null;
+
+    if (windDirection != null) {
+      twa = computeTWA(heading, windDirection);
+      tack = twa >= 0 ? 'starboard' : 'port';
+      pointOfSail = classifyPointOfSail(Math.abs(twa));
+
+      // VMG for player boat (index 0)
+      if (i === 0) {
+        const twaRad = (twa * Math.PI) / 180;
+        vmg = speedNormalized * Math.cos(twaRad);
+      }
+    }
 
     boats.push({
       slot: b.slot ?? 0,
-      heading: b.heading ?? 0,
+      heading,
       x: (b.posX ?? 0) * COORDINATE_SCALE,
       y: (b.posY ?? 0) * COORDINATE_SCALE,
       rateOfTurn: b.turnRate ?? 0,
@@ -76,11 +127,12 @@ export function normalizeInshoreState(decodedState) {
       penaltyTimer: b.penaltyTimer ?? 65535,
       raceProgress: b.raceProgress ?? 0,
       distanceSailed: b.distanceSailed ?? 0,
+      twa,
+      tack,
+      pointOfSail,
+      vmg,
     });
   }
-
-  const windDirection = decodedState.boats?.[0]?.targetHeading ?? null;
-  const windSpeed = decodedState.raw?.[6]?.[0] ?? null;
 
   return {
     tick: decodedState.tick ?? 0,

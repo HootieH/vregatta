@@ -97,10 +97,11 @@ export class LiveState {
 
   updateInshore(normalizedState) {
     if (!normalizedState || !normalizedState.boats) {
-      return { changed: false };
+      return { changed: false, events: [] };
     }
 
     let changed = false;
+    const detectedEvents = [];
     this.inshoreTick = normalizedState.tick;
 
     // Wind data from Inshore state (field 4 = direction, field 6 = speed)
@@ -116,10 +117,30 @@ export class LiveState {
       if (!prev || prev.heading !== boat.heading || prev.x !== boat.x || prev.y !== boat.y || prev.speedRaw !== boat.speedRaw) {
         changed = true;
       }
+
+      // Detect tack/gybe events for player boat from TWA sign change
+      if (boat.isPlayer && prev && prev.twa != null && boat.twa != null
+          && prev.twa !== 0 && boat.twa !== 0
+          && Math.sign(prev.twa) !== Math.sign(boat.twa)) {
+        const now = normalizedState.timestamp ?? Date.now();
+        if (Math.abs(boat.twa) <= 90) {
+          detectedEvents.push({ type: 'tack', timestamp: now, source: 'inshore' });
+        } else {
+          detectedEvents.push({ type: 'gybe', timestamp: now, source: 'inshore' });
+        }
+      }
+
       this.inshoreBoats.set(boat.slot, boat);
     }
 
-    return { changed };
+    for (const evt of detectedEvents) {
+      this.events.push(evt);
+    }
+    if (this.events.length > MAX_EVENTS) {
+      this.events.splice(0, this.events.length - MAX_EVENTS);
+    }
+
+    return { changed, events: detectedEvents };
   }
 
   getSnapshot() {
@@ -140,6 +161,11 @@ export class LiveState {
       inshoreWindDirection: this.inshoreWindDirection ?? null,
       inshoreWindSpeed: this.inshoreWindSpeed ?? null,
       inshorePlayerBoat: playerBoat,
+      inshoreTwa: playerBoat?.twa ?? null,
+      inshoreTack: playerBoat?.tack ?? null,
+      inshorePointOfSail: playerBoat?.pointOfSail ?? null,
+      inshoreVmg: playerBoat?.vmg ?? null,
+      inshoreSpeed: playerBoat?.speedRaw ?? null,
     };
   }
 }

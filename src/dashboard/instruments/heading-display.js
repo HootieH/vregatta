@@ -79,12 +79,18 @@ export function init(containerId) {
   }
 
   function update(snapshot) {
-    if (!snapshot?.boat || snapshot.boat.heading == null) {
+    // Use Inshore heading when active
+    const useInshore = snapshot?.inshoreActive && snapshot.inshorePlayerBoat;
+    const rawHeading = useInshore
+      ? snapshot.inshorePlayerBoat.heading
+      : snapshot?.boat?.heading;
+
+    if (rawHeading == null) {
       valueEl.textContent = '---';
       return;
     }
 
-    const heading = Math.round(snapshot.boat.heading);
+    const heading = Math.round(rawHeading);
     valueEl.textContent = String(heading).padStart(3, '0') + '\u00B0';
     lastHeading = heading;
     drawTape(heading);
