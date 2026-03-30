@@ -5,15 +5,12 @@
  * with track trails, mark diamonds, and a wind direction indicator.
  */
 import L from 'leaflet';
-import { initWindViz } from './wind-viz.js';
-import { initWindShadow } from './wind-shadow.js';
 
 const PLAYER_COLOR = '#3a86ff';
 const COMPETITOR_COLOR = '#ff9f1c';
 const GIVEWAY_COLOR = '#ff3333';
 const STANDON_COLOR = '#00e676';
 const STALE_COLOR = '#888888';
-const MARK_COLOR = '#ff8c00';
 const GRID_COLOR = '#1a2a3a';
 const TRACK_MAX_POINTS = 60; // ~30 seconds at 2 updates/sec
 
@@ -36,24 +33,11 @@ function createBoatIcon(heading, color, size, opacity) {
   });
 }
 
-function createMarkIcon(label) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="26" viewBox="0 0 20 26">
-    <polygon points="10,2 18,10 10,18 2,10" fill="${MARK_COLOR}" fill-opacity="0.4" stroke="${MARK_COLOR}" stroke-width="2"/>
-    <text x="10" y="25" text-anchor="middle" fill="${MARK_COLOR}" font-size="9" font-family="monospace" font-weight="bold">${label}</text>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    iconSize: [20, 26],
-    iconAnchor: [10, 13],
-    className: '',
-  });
-}
-
 /**
  * Initialize the Inshore map in the given container.
  *
  * @param {string} containerId - DOM element ID
- * @returns {{ update: function, updateMarks: function, updateEncounters: function, resize: function }}
+ * @returns {{ update: function, updateEncounters: function, resize: function }}
  */
 export function initInshoreMap(containerId) {
   const container = document.getElementById(containerId);
@@ -78,20 +62,6 @@ export function initInshoreMap(containerId) {
   let encounterRoles = new Map();
   // Fleet name lookup: slot -> playerName
   let fleetNames = new Map();
-  // Mark markers
-  const markMarkers = new Map();
-  let courseLine = null;
-
-  // Course inference layers
-  let startLineLayer = null;
-  let gateLineLayer = null;
-  const gateMarkMarkers = [];
-  let courseAxisLayer = null;
-  let portLaylLayer = null;
-  let stbdLaylLayer = null;
-  let startLabel = null;
-  let gateLabel = null;
-
   // North indicator — top-left corner
   const northEl = document.createElement('div');
   northEl.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1000;pointer-events:none;text-align:center;';
@@ -102,10 +72,10 @@ export function initInshoreMap(containerId) {
   </svg>`;
   container.appendChild(northEl);
 
-  // Wind indicator overlay — top-right corner
+  // Wind direction overlay — top-right corner (shows TWD from player's field 4)
   const windEl = document.createElement('div');
   windEl.className = 'map-wind-indicator';
-  windEl.innerHTML = '<div class="map-wind-label" style="font-size:10px;color:#888;margin-bottom:2px;">WIND</div><div class="map-wind-arrow"></div><div class="map-wind-value">---</div>';
+  windEl.innerHTML = '<div class="map-wind-label">TWD</div><div class="map-wind-value">---</div>';
   container.appendChild(windEl);
 
   // Fleet counter overlay
@@ -114,10 +84,6 @@ export function initInshoreMap(containerId) {
   fleetCounterEl.style.cssText = 'position:absolute;bottom:8px;left:8px;z-index:1000;background:rgba(0,0,0,0.7);color:#ccc;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;pointer-events:none;';
   fleetCounterEl.textContent = '';
   container.appendChild(fleetCounterEl);
-
-  // Wind visualization layers
-  const windViz = initWindViz(map, container);
-  const windShadow = initWindShadow(map, container);
 
   // Heading projection line for player
   const headingLine = L.polyline([], {
@@ -285,19 +251,10 @@ export function initInshoreMap(containerId) {
       drawGrid(playerBoat.x, playerBoat.y);
     }
 
-    // Update wind indicator — arrow shows where wind comes FROM
+    // Update wind direction display (player's field 4 value)
     if (snapshot.inshoreWindDirection != null) {
-      const wd = snapshot.inshoreWindDirection;
-      const arrowSvg = `<svg width="32" height="32" viewBox="0 0 32 32">
-        <circle cx="16" cy="16" r="14" fill="none" stroke="#00b4d8" stroke-width="1" opacity="0.3"/>
-        <g transform="rotate(${wd}, 16, 16)">
-          <line x1="16" y1="28" x2="16" y2="6" stroke="#00b4d8" stroke-width="2.5"/>
-          <polygon points="16,4 11,11 21,11" fill="#00b4d8"/>
-        </g>
-      </svg>`;
-      windEl.querySelector('.map-wind-arrow').innerHTML = arrowSvg;
       const valueEl = windEl.querySelector('.map-wind-value');
-      if (valueEl) valueEl.textContent = `${Math.round(wd)}°`;
+      if (valueEl) valueEl.textContent = `${Math.round(snapshot.inshoreWindDirection)}°`;
     }
 
     // Update fleet counter
@@ -391,11 +348,6 @@ export function initInshoreMap(containerId) {
       headingLine.setLatLngs([pos, [endX, endY]]);
     }
 
-    // Update wind visualization and shadow cones
-    windViz.update(snapshot);
-    windViz.updateBoatWinds(allBoats);
-    windShadow.update(allBoats, snapshot.inshoreWindDirection);
-
     // Auto-zoom: fit visible boats (not stale) with padding
     const boatsForZoom = allBoats.filter(b => visibleSlots.has(b.slot));
     if (boatsForZoom.length > 0) {
@@ -417,45 +369,6 @@ export function initInshoreMap(containerId) {
     }
   }
 
-  function updateMarks(marks) {
-    if (!marks) return;
-
-    // Remove stale
-    for (const [id, marker] of markMarkers) {
-      if (!marks.find(m => m.id === id)) {
-        map.removeLayer(marker);
-        markMarkers.delete(id);
-      }
-    }
-
-    // Draw marks
-    for (const mark of marks) {
-      const pos = [mark.x, mark.y];
-      const existing = markMarkers.get(mark.id);
-      if (existing) {
-        existing.setLatLng(pos);
-      } else {
-        const marker = L.marker(pos, { icon: createMarkIcon(mark.id), interactive: false }).addTo(map);
-        markMarkers.set(mark.id, marker);
-      }
-    }
-
-    // Course line
-    if (marks.length >= 2) {
-      const coords = marks.map(m => [-m.y, m.x]);
-      if (courseLine) {
-        courseLine.setLatLngs(coords);
-      } else {
-        courseLine = L.polyline(coords, {
-          color: MARK_COLOR,
-          opacity: 0.3,
-          weight: 1.5,
-          dashArray: '6, 4',
-        }).addTo(map);
-      }
-    }
-  }
-
   function updateEncounters(encounters) {
     encounterRoles.clear();
     if (!encounters) return;
@@ -464,192 +377,6 @@ export function initInshoreMap(containerId) {
         // If player is give-way, the other boat is stand-on and vice versa
         const otherRole = enc.playerRole === 'give-way' ? 'stand-on' : 'give-way';
         encounterRoles.set(enc.otherBoat, otherRole);
-      }
-    }
-  }
-
-  function createDiamondIcon(color, label) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30">
-      <polygon points="12,2 22,12 12,22 2,12" fill="${color}" fill-opacity="0.5" stroke="${color}" stroke-width="2"/>
-      <text x="12" y="29" text-anchor="middle" fill="${color}" font-size="9" font-family="monospace" font-weight="bold">${label}</text>
-    </svg>`;
-    return L.divIcon({
-      html: svg,
-      iconSize: [24, 30],
-      iconAnchor: [12, 15],
-      className: '',
-    });
-  }
-
-  function createCourseLabel(text) {
-    return L.divIcon({
-      html: `<span style="color:#ccc;font-size:10px;font-family:monospace;font-weight:bold;text-shadow:0 0 4px #000,0 0 2px #000">${text}</span>`,
-      iconSize: [50, 14],
-      iconAnchor: [25, -8],
-      className: '',
-    });
-  }
-
-  /**
-   * Draw inferred course features: start line, windward gate, laylines, course axis.
-   *
-   * @param {object} course - from CourseInferrer.getCourse()
-   * @param {Array} marks - from CourseInferrer.getMarks()
-   * @param {object|null} laylines - from CourseInferrer.getLaylines()
-   */
-  function updateCourse(course, marks, laylines) {
-    // --- Start/finish line ---
-    if (course && course.startLine) {
-      const sl = course.startLine;
-      const coords = [[sl.x1, sl.y1], [sl.x2, sl.y2]];
-      if (startLineLayer) {
-        startLineLayer.setLatLngs(coords);
-      } else {
-        startLineLayer = L.polyline(coords, {
-          color: '#ffffff',
-          opacity: 0.7,
-          weight: 2,
-        }).addTo(map);
-      }
-      // Start label at midpoint
-      const midX = (sl.x1 + sl.x2) / 2;
-      const midY = (sl.y1 + sl.y2) / 2;
-      if (startLabel) {
-        startLabel.setLatLng([midX, midY]);
-      } else {
-        startLabel = L.marker([midX, midY], {
-          icon: createCourseLabel('START'),
-          interactive: false,
-        }).addTo(map);
-      }
-    } else {
-      if (startLineLayer) { map.removeLayer(startLineLayer); startLineLayer = null; }
-      if (startLabel) { map.removeLayer(startLabel); startLabel = null; }
-    }
-
-    // --- Windward gate ---
-    if (course && course.windwardGate) {
-      const gate = course.windwardGate;
-
-      // Gate dashed line between pins
-      const gateCoords = [[gate.port.x, gate.port.y], [gate.stbd.x, gate.stbd.y]];
-      if (gateLineLayer) {
-        gateLineLayer.setLatLngs(gateCoords);
-      } else {
-        gateLineLayer = L.polyline(gateCoords, {
-          color: MARK_COLOR,
-          opacity: 0.6,
-          weight: 1.5,
-          dashArray: '6, 4',
-        }).addTo(map);
-      }
-
-      // Gate diamond marks
-      const gatePositions = [
-        { x: gate.port.x, y: gate.port.y, label: 'P' },
-        { x: gate.stbd.x, y: gate.stbd.y, label: 'S' },
-      ];
-      for (let i = 0; i < gatePositions.length; i++) {
-        const gp = gatePositions[i];
-        if (gateMarkMarkers[i]) {
-          gateMarkMarkers[i].setLatLng([gp.x, gp.y]);
-        } else {
-          gateMarkMarkers[i] = L.marker([gp.x, gp.y], {
-            icon: createDiamondIcon(MARK_COLOR, gp.label),
-            interactive: false,
-          }).addTo(map);
-        }
-      }
-
-      // Gate label at midpoint
-      const gateMidX = (gate.port.x + gate.stbd.x) / 2;
-      const gateMidY = (gate.port.y + gate.stbd.y) / 2;
-      if (gateLabel) {
-        gateLabel.setLatLng([gateMidX, gateMidY]);
-      } else {
-        gateLabel = L.marker([gateMidX, gateMidY], {
-          icon: createCourseLabel('GATE'),
-          interactive: false,
-        }).addTo(map);
-      }
-    } else {
-      if (gateLineLayer) { map.removeLayer(gateLineLayer); gateLineLayer = null; }
-      for (const m of gateMarkMarkers) { if (m) map.removeLayer(m); }
-      gateMarkMarkers.length = 0;
-      if (gateLabel) { map.removeLayer(gateLabel); gateLabel = null; }
-    }
-
-    // --- Course axis ---
-    if (course && course.startLine && course.windwardGate) {
-      const sl = course.startLine;
-      const gate = course.windwardGate;
-      const startMid = [(sl.x1 + sl.x2) / 2, (sl.y1 + sl.y2) / 2];
-      const gateMid = [(gate.port.x + gate.stbd.x) / 2, (gate.port.y + gate.stbd.y) / 2];
-      if (courseAxisLayer) {
-        courseAxisLayer.setLatLngs([startMid, gateMid]);
-      } else {
-        courseAxisLayer = L.polyline([startMid, gateMid], {
-          color: '#888888',
-          opacity: 0.25,
-          weight: 1,
-          dashArray: '4, 8',
-        }).addTo(map);
-      }
-    } else {
-      if (courseAxisLayer) { map.removeLayer(courseAxisLayer); courseAxisLayer = null; }
-    }
-
-    // --- Laylines ---
-    if (laylines) {
-      // Port layline (red)
-      if (laylines.port && laylines.port.line.length === 2) {
-        const coords = laylines.port.line.map(p => [p.x, p.y]);
-        if (portLaylLayer) {
-          portLaylLayer.setLatLngs(coords);
-        } else {
-          portLaylLayer = L.polyline(coords, {
-            color: '#ff3333',
-            opacity: 0.4,
-            weight: 1.5,
-            dashArray: '8, 6',
-          }).addTo(map);
-        }
-      }
-      // Starboard layline (green)
-      if (laylines.stbd && laylines.stbd.line.length === 2) {
-        const coords = laylines.stbd.line.map(p => [p.x, p.y]);
-        if (stbdLaylLayer) {
-          stbdLaylLayer.setLatLngs(coords);
-        } else {
-          stbdLaylLayer = L.polyline(coords, {
-            color: '#00e676',
-            opacity: 0.4,
-            weight: 1.5,
-            dashArray: '8, 6',
-          }).addTo(map);
-        }
-      }
-    } else {
-      if (portLaylLayer) { map.removeLayer(portLaylLayer); portLaylLayer = null; }
-      if (stbdLaylLayer) { map.removeLayer(stbdLaylLayer); stbdLaylLayer = null; }
-    }
-
-    // --- Also draw individual inferred marks as diamonds ---
-    if (marks && marks.length > 0) {
-      // Draw mark-2 endpoints as white diamonds if start line isn't drawn yet
-      for (const mark of marks) {
-        if (mark.id === 2 && !course?.startLine) {
-          const key = `inferred-${mark.id}-${mark.endIndex ?? 0}`;
-          if (!markMarkers.has(key)) {
-            const m = L.marker([mark.x, mark.y], {
-              icon: createDiamondIcon('#ffffff', 'S'),
-              interactive: false,
-            }).addTo(map);
-            markMarkers.set(key, m);
-          } else {
-            markMarkers.get(key).setLatLng([mark.x, mark.y]);
-          }
-        }
       }
     }
   }
@@ -704,5 +431,5 @@ export function initInshoreMap(containerId) {
   // Start animation loop
   requestAnimationFrame(animate);
 
-  return { update, updateMarks, updateCourse, updateEncounters, resize, windViz, windShadow };
+  return { update, updateEncounters, resize };
 }

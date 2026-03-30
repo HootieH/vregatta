@@ -245,10 +245,6 @@ export class LiveState {
       // Fleet data is added by background.js from FleetManager
       inshoreFleet: [],
       inshoreFleetStats: { total: 0, inRace: 0, withPosition: 0, withName: 0 },
-      // Course inference data — populated by background.js from CourseInferrer
-      inshoreCourse: null,
-      inshoreMarks: [],
-      inshoreLaylines: null,
     };
   }
 }

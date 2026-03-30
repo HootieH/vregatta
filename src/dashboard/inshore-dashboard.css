@@ -390,11 +390,6 @@ html, body {
   pointer-events: none;
 }
 
-.map-wind-arrow {
-  width: 24px;
-  height: 24px;
-}
-
 .map-wind-label {
   font-size: 12px;
   color: #00b4d8;
@@ -417,78 +412,6 @@ html, body {
   color: #00b4d8;
   pointer-events: none;
   white-space: nowrap;
-}
-
-/* Map toolbar — toggle buttons */
-.map-toolbar {
-  position: absolute;
-  bottom: 32px;
-  left: 8px;
-  z-index: 1000;
-  display: flex;
-  gap: 4px;
-}
-
-.map-toolbar-btn {
-  width: 32px;
-  height: 32px;
-  background: rgba(10, 10, 26, 0.8);
-  border: 1px solid #2a2a4a;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
-  opacity: 0.5;
-}
-
-.map-toolbar-btn.active {
-  opacity: 1;
-  border-color: #3a86ff;
-}
-
-.map-toolbar-btn:hover {
-  background: rgba(58, 134, 255, 0.2);
-  border-color: #3a86ff;
-}
-
-/* Wind shadow warning */
-.map-shadow-warning {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1000;
-  background: rgba(255, 50, 50, 0.15);
-  border: 2px solid #ff3333;
-  border-radius: 8px;
-  padding: 10px 20px;
-  text-align: center;
-  pointer-events: none;
-  animation: shadow-pulse 1.5s ease-in-out infinite;
-}
-
-.shadow-warning-title {
-  font-family: 'Courier New', monospace;
-  font-size: 16px;
-  font-weight: bold;
-  color: #ff3333;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.shadow-warning-detail {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: #ff9999;
-  margin-top: 4px;
-}
-
-@keyframes shadow-pulse {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 1; }
 }
 
 /* Boat labels on map */
