@@ -52,19 +52,30 @@ export class RaceRecorder {
     this._stateCount++;
     if (this._stateCount % THROTTLE_INTERVAL !== 0) return;
 
-    // Strip to lightweight representation
+    // Strip to lightweight but complete representation
     const compact = {
       tick: normalizedState.tick ?? 0,
+      ts: normalizedState.timestamp ?? Date.now(),
       boats: (normalizedState.boats || []).map((b) => ({
         slot: b.slot,
-        heading: b.heading,
+        heading: +(b.heading?.toFixed(1) ?? 0),
         x: b.x,
         y: b.y,
-        speed: b.speed,
-        twa: b.twa,
+        speedRaw: b.speedRaw ?? 0,
+        speedKnots: b.speedKnots ?? 0,
+        twa: b.twa != null ? +(b.twa.toFixed(1)) : null,
         tack: b.tack,
+        pointOfSail: b.pointOfSail,
+        rateOfTurn: b.rateOfTurn,
+        turningDirection: b.turningDirection,
+        penaltyTimer: b.penaltyTimer,
+        isPlayer: b.isPlayer ?? false,
       })),
       windDirection: normalizedState.windDirection ?? null,
+      windSpeed: normalizedState.windSpeed ?? null,
+      currentLap: normalizedState.currentLap ?? null,
+      raceTimerSeconds: normalizedState.raceTimerSeconds ?? null,
+      raceEventCode: normalizedState.raceEventCode ?? 0,
     };
 
     this._states.push(compact);
@@ -77,6 +88,17 @@ export class RaceRecorder {
   addEvent(event) {
     if (!this._recording || !event) return;
     this._events.push({ ...event });
+  }
+
+  /**
+   * Record a helm input (heading change command from the player).
+   * @param {number} heading — decoded heading in degrees
+   * @param {number} timestamp
+   */
+  addHelmInput(heading, timestamp) {
+    if (!this._recording) return;
+    if (!this._helmInputs) this._helmInputs = [];
+    this._helmInputs.push({ heading: +(heading.toFixed(1)), ts: timestamp ?? Date.now() });
   }
 
   /**
@@ -122,9 +144,12 @@ export class RaceRecorder {
       states: this._states.slice(),
       events: this._events.slice(),
       marks: this._marks.slice(),
+      helmInputs: (this._helmInputs || []).slice(),
       startTime,
       endTime,
       duration: (endTime - startTime) / 1000,
+      stateCount: this._stateCount,
+      version: '0.3.5',
     };
   }
 

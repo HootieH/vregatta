@@ -28,6 +28,7 @@ import { decodeState } from './colyseus/state-decoder.js';
 import { normalizeInshoreState } from './colyseus/inshore-pipeline.js';
 import { decodeMasterState, decodeMasterUpdate } from './colyseus/master-decoder.js';
 import { FleetManager } from './colyseus/fleet-manager.js';
+import { RaceRecorder } from './storage/race-recorder.js';
 import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } from './telemetry.js';
 
 const log = createLogger('background');
@@ -42,6 +43,10 @@ let db = null;
 const state = new LiveState();
 const fleetManager = new FleetManager();
 const masterLog = createLogger('master-decoder');
+
+// Auto-record every Inshore race in background
+const raceRecorder = new RaceRecorder();
+let raceAutoStarted = false;
 
 // Initialize DB — wrapped to avoid top-level await crash in some Chrome versions
 (async () => {
@@ -328,6 +333,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'getCurrentRecording') {
+    const data = raceRecorder.getRaceData();
+    sendResponse({
+      recording: raceRecorder.isRecording(),
+      data: data.states.length > 0 ? data : null,
+    });
+    return true;
+  }
+
   if (message.type === 'deleteReplay') {
     if (!db) { sendResponse({ ok: false, error: 'DB not ready' }); return true; }
     deleteReplay(db, message.raceId)
@@ -533,6 +547,10 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
         const currentHdg = playerBoat?.heading;
         const delta = currentHdg != null ? (decoded.heading - currentHdg).toFixed(1) : '?';
         wsLog.info(`Helm: ${decoded.heading.toFixed(1)}\u00b0 (delta=${delta}\u00b0, input #${stats.inshoreHelmInputs})`, { direction });
+        // Record helm input
+        if (raceRecorder.isRecording()) {
+          raceRecorder.addHelmInput(decoded.heading, timestamp || Date.now());
+        }
       } else {
         wsLog.warn(`Helm input decode failed (size=${data?.size ?? '?'}, input #${stats.inshoreHelmInputs})`, { direction });
       }
@@ -579,8 +597,26 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const decompressed = await decompressStateAsync(payload);
           const decoded_state = decodeState(decompressed);
           const normalized = normalizeInshoreState(decoded_state);
-          state.updateInshore(normalized);
+          const updateResult = state.updateInshore(normalized);
           fleetManager.updateFromGame(normalized);
+
+          // Record detected events (tack, gybe, wind shift)
+          if (raceRecorder.isRecording() && updateResult.events) {
+            for (const evt of updateResult.events) {
+              raceRecorder.addEvent(evt);
+            }
+          }
+
+          // Auto-record race in background
+          if (!raceAutoStarted && normalized.boats.length > 0) {
+            raceAutoStarted = true;
+            const rid = normalized.raceId || `inshore-${Date.now()}`;
+            raceRecorder.startRecording(rid);
+            log.info(`Auto-recording Inshore race: ${rid}`);
+          }
+          if (raceRecorder.isRecording()) {
+            raceRecorder.addState(normalized);
+          }
 
           // Telemetry
           stats.inshoreStateDecodes++;
@@ -629,6 +665,21 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
 
     case 'ws-leave':
       wsLog.info('WS leave room', { direction });
+      // Auto-stop recording on leave
+      if (raceRecorder.isRecording()) {
+        raceRecorder.addEvent({ type: 'leave', timestamp: Date.now(), direction });
+        const raceData = raceRecorder.stopRecording();
+        raceAutoStarted = false;
+        log.info(`Race recording stopped: ${raceData.states.length} states, ${raceData.events.length} events, ${raceData.helmInputs.length} helm inputs, ${raceData.duration.toFixed(0)}s`);
+        // Save to IndexedDB if available
+        if (db) {
+          raceRecorder.persist(db).then(() => {
+            log.info('Race recording saved to IndexedDB');
+          }).catch(err => {
+            log.error('Failed to save race recording: ' + err.message);
+          });
+        }
+      }
       break;
 
     default:

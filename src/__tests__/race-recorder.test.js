@@ -92,16 +92,17 @@ describe('RaceRecorder', () => {
     expect(stored.boats[0]).toHaveProperty('heading');
     expect(stored.boats[0]).toHaveProperty('x');
     expect(stored.boats[0]).toHaveProperty('y');
-    expect(stored.boats[0]).toHaveProperty('speed');
+    expect(stored.boats[0]).toHaveProperty('speedRaw');
+    expect(stored.boats[0]).toHaveProperty('speedKnots');
     expect(stored.boats[0]).toHaveProperty('twa');
     expect(stored.boats[0]).toHaveProperty('tack');
-
-    // Should NOT have extra fields
-    expect(stored.boats[0]).not.toHaveProperty('rateOfTurn');
-    expect(stored.boats[0]).not.toHaveProperty('isPlayer');
-    expect(stored.boats[0]).not.toHaveProperty('penaltyTimer');
-    expect(stored).not.toHaveProperty('windSpeed');
-    expect(stored).not.toHaveProperty('raceEventCode');
+    expect(stored.boats[0]).toHaveProperty('pointOfSail');
+    expect(stored.boats[0]).toHaveProperty('rateOfTurn');
+    expect(stored.boats[0]).toHaveProperty('isPlayer');
+    // Now we store more fields for richer replay data
+    expect(stored.boats[0]).toHaveProperty('penaltyTimer');
+    expect(stored).toHaveProperty('windDirection');
+    expect(stored).toHaveProperty('raceEventCode');
   });
 
   it('stores events', () => {
