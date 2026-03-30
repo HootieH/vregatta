@@ -81,6 +81,8 @@ export function initInshoreInstruments(containerId) {
   makeCell('twd', 'TWD');
   makeCell('pos', 'SAIL');
   makeCell('vmg', 'VMG');
+  makeCell('lap', 'LAP');
+  makeCell('timer', 'TIMER');
 
   function update(snapshot) {
     if (!snapshot) return;
@@ -177,6 +179,31 @@ export function initInshoreInstruments(containerId) {
       vmg.value.textContent = '---';
       vmg.sub.textContent = '';
       vmg.value.className = 'instr-value';
+    }
+
+    // LAP
+    const lap = cells.lap;
+    if (snapshot.inshoreCurrentLap != null) {
+      lap.value.textContent = String(snapshot.inshoreCurrentLap);
+      lap.sub.textContent = '';
+    } else {
+      lap.value.textContent = '---';
+      lap.sub.textContent = '';
+    }
+
+    // TIMER — race countdown
+    const timer = cells.timer;
+    if (snapshot.inshoreRaceTimerSeconds != null) {
+      const secs = snapshot.inshoreRaceTimerSeconds;
+      const min = Math.floor(secs / 60);
+      const sec = secs % 60;
+      timer.value.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+      timer.value.className = 'instr-value';
+      if (secs < 30) timer.value.classList.add('timer-critical');
+      else if (secs < 60) timer.value.classList.add('timer-warning');
+    } else {
+      timer.value.textContent = '---';
+      timer.value.className = 'instr-value';
     }
   }
 

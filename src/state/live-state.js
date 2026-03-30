@@ -107,12 +107,22 @@ export class LiveState {
     const detectedEvents = [];
     this.inshoreTick = normalizedState.tick;
 
-    // Wind data from Inshore state (field 4 = direction, field 6 = speed)
+    // Wind data from Inshore state
     if (normalizedState.windDirection != null) {
       this.inshoreWindDirection = normalizedState.windDirection;
     }
     if (normalizedState.windSpeed != null) {
       this.inshoreWindSpeed = normalizedState.windSpeed;
+    }
+    // Race info
+    if (normalizedState.currentLap != null) {
+      this.inshoreCurrentLap = normalizedState.currentLap;
+    }
+    if (normalizedState.raceTimerSeconds != null) {
+      this.inshoreRaceTimerSeconds = normalizedState.raceTimerSeconds;
+    }
+    if (normalizedState.raceId != null) {
+      this.inshoreRaceId = normalizedState.raceId;
     }
 
     for (const boat of normalizedState.boats) {
@@ -179,6 +189,9 @@ export class LiveState {
       inshoreVmg: playerBoat?.vmg ?? null,
       inshoreSpeed: playerBoat?.speedRaw ?? null,
       inshoreAccStats: accStats,
+      inshoreCurrentLap: this.inshoreCurrentLap ?? null,
+      inshoreRaceTimerSeconds: this.inshoreRaceTimerSeconds ?? null,
+      inshoreRaceId: this.inshoreRaceId ?? null,
       // Fleet data is added by background.js from FleetManager
       inshoreFleet: [],
       inshoreFleetStats: { total: 0, inRace: 0, withPosition: 0, withName: 0 },

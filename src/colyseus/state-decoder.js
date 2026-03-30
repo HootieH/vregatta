@@ -24,10 +24,20 @@
  *  Key 14 - Array[6] of uint16: BOAT SPEED (proportional to position change rate)
  *                               ~10000 = full speed, decays toward 0 when stopped/turning
  *                               Correlates directly with sqrt(dx²+dy²)/dt
- *  Key 15 - Array[6] of uint16: RACE PROGRESS (ramps 0→200 over race duration)
- *                               Only non-zero for actively racing boats
- *  Key 16 - Array[6] of uint16: DISTANCE SAILED or score accumulator
- *                               Ramps 0→65535 over race, only for active boats
+ *  Key 15 - Array[N] of uint16: RACE PROGRESS (ramps 0→200 in some races, 0 in others)
+ *  Key 16 - Array[N] of uint16: DISTANCE SAILED or score (0 in many races)
+ *  Key 17 - uint8:              CURRENT LAP/LEG number (e.g., 3→4 = lap change mid-race)
+ *  Key 18 - uint32:             RACE COUNTDOWN TIMER (decreasing, ~560 units/sec)
+ *                               Reaches 0 when race ends
+ *  Key 19 - Array[N] of uint8:  BOAT CLASS/TYPE (74 or 96 in captures, 2 distinct values)
+ *  Key 20 - scalar:             Always 0 (unused)
+ *  Key 21 - scalar:             Always 0 (unused)
+ *  Key 22 - Array[N] of uint8:  BOAT MODEL ID (constant 138 in capture — same boat class)
+ *  Key 24 - uint32:             RACE ID / SEED (constant per race, e.g., 130986)
+ *
+ * Fields 7 and 9 are identical ACTIVE BOAT BITMASKS:
+ *  Key 7  - Array[1-2]:         Bitmask of active boats (255=8 boats, 127=7, etc.)
+ *  Key 9  - Array[1-2]:         Same as Key 7 (duplicate/confirmation)
  *
  * The 6-element arrays correspond to the 6 boats in the race.
  */
@@ -236,15 +246,23 @@ export function decodeState(bytes) {
   const boatCount = slots.length;
   result.boatCount = boatCount;
 
+  // Race-level fields
+  result.currentLap = raw[17] ?? null;
+  result.raceTimer = raw[18] ?? null;
+  result.raceId = raw[24] ?? null;
+  result.eventFlags = raw[2] ?? null;
+
   // Extract per-boat data
   const headings = raw[11] || [];    // current heading (scaled int16)
-  const targets = raw[4] || [];      // target heading
+  const targets = raw[4] || [];      // target heading / wind direction
   const turnRates = raw[12] || [];   // rate of turn
   const positions = raw[13] || [];   // [x, y] pairs interleaved
   const field10 = raw[10] || [];     // maneuver penalty
   const field14 = raw[14] || [];     // speed (proportional)
   const field15 = raw[15] || [];     // race progress
   const field16 = raw[16] || [];     // distance sailed
+  const boatTypes = raw[19] || [];   // boat class/type
+  const boatModels = raw[22] || [];  // boat model ID
 
   for (let i = 0; i < boatCount; i++) {
     const boat = {
@@ -257,6 +275,8 @@ export function decodeState(bytes) {
       speed: i < field14.length ? field14[i] : null,
       penaltyTimer: i < field10.length ? field10[i] : null,
       raceProgress: i < field15.length ? field15[i] : null,
+      boatType: i < boatTypes.length ? boatTypes[i] : null,
+      boatModel: i < boatModels.length ? boatModels[i] : null,
       distanceSailed: i < field16.length ? field16[i] : null,
     };
     result.boats.push(boat);

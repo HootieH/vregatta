@@ -148,6 +148,10 @@ export function normalizeInshoreState(decodedState) {
   const raceEventCode = decodedState.raw?.[2]?.[0] ?? 0;
   const tackFlags = Array.isArray(decodedState.raw?.[3]) ? [...decodedState.raw[3]] : [];
 
+  // Race timer: field 18 counts down at ~560 units/sec
+  const raceTimerRaw = decodedState.raceTimer ?? null;
+  const raceTimerSeconds = raceTimerRaw != null ? Math.round(raceTimerRaw / 560) : null;
+
   return {
     tick: decodedState.tick ?? 0,
     boats,
@@ -156,6 +160,10 @@ export function normalizeInshoreState(decodedState) {
     raceEventCode,
     tackFlags,
     playerBoatIndex: 0,
+    currentLap: decodedState.currentLap ?? null,
+    raceTimer: raceTimerRaw,
+    raceTimerSeconds,
+    raceId: decodedState.raceId ?? null,
     timestamp: Date.now(),
   };
 }
