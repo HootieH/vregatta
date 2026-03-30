@@ -19,6 +19,24 @@ const rulesPanel = initRulesPanel('rules-sidebar');
 const events = initInshoreEvents('rules-sidebar');
 const capture = initCapture();
 
+// --- Wind/shadow toggle controls ---
+const toggleWindBtn = document.getElementById('toggle-wind');
+const toggleShadowBtn = document.getElementById('toggle-shadow');
+
+if (toggleWindBtn && raceMap) {
+  toggleWindBtn.addEventListener('click', () => {
+    const nowVisible = raceMap.windViz.toggle();
+    toggleWindBtn.classList.toggle('active', nowVisible);
+  });
+}
+
+if (toggleShadowBtn && raceMap) {
+  toggleShadowBtn.addEventListener('click', () => {
+    const nowVisible = raceMap.windShadow.toggle();
+    toggleShadowBtn.classList.toggle('active', nowVisible);
+  });
+}
+
 // Mark detection disabled — was producing noisy jumping marks
 
 // Fleet count display

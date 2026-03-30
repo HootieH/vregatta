@@ -9,7 +9,16 @@
 </head>
 <body>
   <div id="inshore-app">
-    <div id="race-map"></div>
+    <div id="race-map">
+      <div id="map-toolbar" class="map-toolbar">
+        <button id="toggle-wind" class="map-toolbar-btn active" title="Toggle wind lines">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 9h14M2 5h14M2 13h14" stroke="#00b4d8" stroke-width="1.5" fill="none" opacity="0.8"/><polygon points="16,9 13,7 13,11" fill="#00b4d8" opacity="0.8"/></svg>
+        </button>
+        <button id="toggle-shadow" class="map-toolbar-btn active" title="Toggle shadow cones">
+          <svg width="18" height="18" viewBox="0 0 18 18"><polygon points="9,4 3,16 15,16" fill="#ff6b35" opacity="0.5" stroke="#ff6b35" stroke-width="1"/></svg>
+        </button>
+      </div>
+    </div>
     <div id="rules-sidebar"></div>
     <div id="instrument-bar"></div>
     <div id="events-panel"></div>

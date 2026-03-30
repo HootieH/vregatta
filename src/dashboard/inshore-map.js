@@ -5,6 +5,8 @@
  * with track trails, mark diamonds, and a wind direction indicator.
  */
 import L from 'leaflet';
+import { initWindViz } from './wind-viz.js';
+import { initWindShadow } from './wind-shadow.js';
 
 const PLAYER_COLOR = '#3a86ff';
 const COMPETITOR_COLOR = '#ff9f1c';
@@ -102,6 +104,10 @@ export function initInshoreMap(containerId) {
   fleetCounterEl.style.cssText = 'position:absolute;bottom:8px;left:8px;z-index:1000;background:rgba(0,0,0,0.7);color:#ccc;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;pointer-events:none;';
   fleetCounterEl.textContent = '';
   container.appendChild(fleetCounterEl);
+
+  // Wind visualization layers
+  const windViz = initWindViz(map, container);
+  const windShadow = initWindShadow(map, container);
 
   // Heading projection line for player
   const headingLine = L.polyline([], {
@@ -354,6 +360,10 @@ export function initInshoreMap(containerId) {
       headingLine.setLatLngs([pos, [endX, endY]]);
     }
 
+    // Update wind visualization and shadow cones
+    windViz.update(snapshot);
+    windShadow.update(allBoats, snapshot.inshoreWindDirection);
+
     // Auto-zoom: fit visible boats (not stale) with padding
     const boatsForZoom = allBoats.filter(b => visibleSlots.has(b.slot));
     if (boatsForZoom.length > 0) {
@@ -469,5 +479,5 @@ export function initInshoreMap(containerId) {
   // Start animation loop
   requestAnimationFrame(animate);
 
-  return { update, updateMarks, updateEncounters, resize };
+  return { update, updateMarks, updateEncounters, resize, windViz, windShadow };
 }
