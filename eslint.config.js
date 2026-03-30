@@ -31,6 +31,7 @@ export default [
         cancelAnimationFrame: 'readonly',
         performance: 'readonly',
         location: 'readonly',
+        XMLHttpRequest: 'readonly',
         atob: 'readonly',
         btoa: 'readonly',
         Buffer: 'readonly',

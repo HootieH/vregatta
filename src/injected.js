@@ -256,4 +256,61 @@
 
     return fetchPromise;
   };
+
+  // --- XMLHttpRequest monkey-patch ---
+  // Unity WebGL uses XHR for loading course data, assets, configs
+  if (VR_BROAD_CAPTURE) {
+    const OrigXHR = window.XMLHttpRequest;
+    const origOpen = OrigXHR.prototype.open;
+    const origSend = OrigXHR.prototype.send;
+
+    OrigXHR.prototype.open = function (method, url, ...rest) {
+      this._vrUrl = url;
+      this._vrMethod = method;
+      return origOpen.call(this, method, url, ...rest);
+    };
+
+    OrigXHR.prototype.send = function (body) {
+      const xhr = this;
+      const url = xhr._vrUrl;
+
+      xhr.addEventListener('load', function () {
+        try {
+          // Only capture non-binary responses and small binary ones
+          const contentType = xhr.getResponseHeader('content-type') || '';
+          const isJson = contentType.includes('json');
+          const isText = contentType.includes('text') || contentType.includes('xml') || contentType.includes('html');
+          const isSmallBinary = !isJson && !isText && xhr.response instanceof ArrayBuffer && xhr.response.byteLength < 50000;
+
+          if (isJson || isText || isSmallBinary) {
+            let responseBody;
+            if (isSmallBinary) {
+              responseBody = '[binary ' + xhr.response.byteLength + ' bytes]';
+            } else {
+              responseBody = xhr.responseText || '';
+            }
+
+            vrLog(1, 'XHR captured: ' + xhr._vrMethod + ' ' + url + ' (' + contentType + ', ' + (responseBody.length || 0) + ' chars)');
+
+            window.postMessage({
+              type: 'vr-intercepted',
+              url: url,
+              method: xhr._vrMethod,
+              body: responseBody,
+              source: 'xhr',
+            }, '*');
+          } else if (url && !url.endsWith('.data') && !url.endsWith('.wasm') && !url.endsWith('.js')) {
+            // Log non-asset URLs we skip
+            vrLog(0, 'XHR skipped (large binary): ' + xhr._vrMethod + ' ' + url + ' (' + contentType + ')');
+          }
+        } catch {
+          // Never break the game
+        }
+      });
+
+      return origSend.call(this, body);
+    };
+
+    vrLog(1, 'XMLHttpRequest interceptor active — capturing all XHR on VR page');
+  }
 })();
