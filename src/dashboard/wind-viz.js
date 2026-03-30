@@ -157,5 +157,53 @@ export function initWindViz(map, container) {
     return visible;
   }
 
-  return { update, toggle, isVisible };
+  // Per-boat wind arrows layer
+  const boatWindGroup = L.layerGroup().addTo(map);
+  const boatWindMarkers = new Map();
+
+  /**
+   * Update per-boat wind arrows — shows a small arrow at each boat's position
+   * indicating their local wind direction.
+   */
+  function updateBoatWinds(boats) {
+    if (!visible || !boats || boats.length === 0) return;
+
+    const activeSlots = new Set();
+    for (const boat of boats) {
+      if (boat.localWindDirection == null) continue;
+      activeSlots.add(boat.slot);
+
+      const pos = [boat.x, boat.y];
+      const wd = boat.localWindDirection;
+      const arrowHtml = `<svg width="16" height="16" viewBox="0 0 16 16" style="opacity:0.6">
+        <g transform="rotate(${wd}, 8, 8)">
+          <line x1="8" y1="14" x2="8" y2="3" stroke="${WIND_COLOR}" stroke-width="1.5"/>
+          <polygon points="8,1 5,6 11,6" fill="${WIND_COLOR}"/>
+        </g>
+      </svg>`;
+
+      let marker = boatWindMarkers.get(boat.slot);
+      if (marker) {
+        marker.setLatLng(pos);
+        marker.setIcon(L.divIcon({ html: arrowHtml, iconSize: [16, 16], iconAnchor: [8, -12], className: '' }));
+      } else {
+        marker = L.marker(pos, {
+          icon: L.divIcon({ html: arrowHtml, iconSize: [16, 16], iconAnchor: [8, -12], className: '' }),
+          interactive: false,
+          zIndexOffset: -100,
+        }).addTo(boatWindGroup);
+        boatWindMarkers.set(boat.slot, marker);
+      }
+    }
+
+    // Remove stale
+    for (const [slot, marker] of boatWindMarkers) {
+      if (!activeSlots.has(slot)) {
+        boatWindGroup.removeLayer(marker);
+        boatWindMarkers.delete(slot);
+      }
+    }
+  }
+
+  return { update, updateBoatWinds, toggle, isVisible };
 }

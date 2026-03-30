@@ -362,6 +362,7 @@ export function initInshoreMap(containerId) {
 
     // Update wind visualization and shadow cones
     windViz.update(snapshot);
+    windViz.updateBoatWinds(allBoats);
     windShadow.update(allBoats, snapshot.inshoreWindDirection);
 
     // Auto-zoom: fit visible boats (not stale) with padding

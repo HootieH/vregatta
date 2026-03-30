@@ -123,7 +123,7 @@ export function initWindShadow(map, container) {
   }
 
   function update(boats, windDirection) {
-    if (windDirection == null || !boats || boats.length === 0) {
+    if (!boats || boats.length === 0) {
       warningEl.style.display = 'none';
       return;
     }
@@ -134,10 +134,12 @@ export function initWindShadow(map, container) {
     // Track which slots still exist
     const activeSlots = new Set();
 
-    // Update shadow cones for non-player boats
+    // Update shadow cones for non-player boats — use per-boat wind direction
     for (const boat of otherBoats) {
       activeSlots.add(boat.slot);
-      const conePoints = computeShadowCone(boat, windDirection);
+      const boatWind = boat.localWindDirection ?? windDirection;
+      if (boatWind == null) continue;
+      const conePoints = computeShadowCone(boat, boatWind);
 
       let poly = shadowPolygons.get(boat.slot);
       if (poly) {
@@ -175,7 +177,9 @@ export function initWindShadow(map, container) {
       let worstSlot = null;
 
       for (const boat of otherBoats) {
-        const result = checkShadow(playerBoat.x, playerBoat.y, boat, windDirection);
+        const boatWind = boat.localWindDirection ?? windDirection;
+        if (boatWind == null) continue;
+        const result = checkShadow(playerBoat.x, playerBoat.y, boat, boatWind);
         if (result.inShadow) {
           if (!worstShadow || result.speedLoss > worstShadow.speedLoss) {
             worstShadow = result;
