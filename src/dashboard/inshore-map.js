@@ -80,10 +80,20 @@ export function initInshoreMap(containerId) {
   const markMarkers = new Map();
   let courseLine = null;
 
-  // Wind indicator overlay
+  // North indicator — top-left corner
+  const northEl = document.createElement('div');
+  northEl.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1000;pointer-events:none;text-align:center;';
+  northEl.innerHTML = `<svg width="32" height="40" viewBox="0 0 32 40">
+    <polygon points="16,2 12,14 20,14" fill="#e74c3c" stroke="#fff" stroke-width="1"/>
+    <polygon points="16,38 12,26 20,26" fill="#333" stroke="#fff" stroke-width="1"/>
+    <text x="16" y="24" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold" font-family="monospace">N</text>
+  </svg>`;
+  container.appendChild(northEl);
+
+  // Wind indicator overlay — top-right corner
   const windEl = document.createElement('div');
   windEl.className = 'map-wind-indicator';
-  windEl.innerHTML = '<div class="map-wind-arrow"></div><div class="map-wind-label">---</div>';
+  windEl.innerHTML = '<div class="map-wind-label" style="font-size:10px;color:#888;margin-bottom:2px;">WIND</div><div class="map-wind-arrow"></div><div class="map-wind-value">---</div>';
   container.appendChild(windEl);
 
   // Fleet counter overlay
@@ -189,17 +199,19 @@ export function initInshoreMap(containerId) {
       drawGrid(playerBoat.x, playerBoat.y);
     }
 
-    // Update wind indicator
+    // Update wind indicator — arrow shows where wind comes FROM
     if (snapshot.inshoreWindDirection != null) {
       const wd = snapshot.inshoreWindDirection;
-      const arrowSvg = `<svg width="24" height="24" viewBox="0 0 24 24">
-        <g transform="rotate(${wd}, 12, 12)">
-          <line x1="12" y1="22" x2="12" y2="4" stroke="#00b4d8" stroke-width="2"/>
-          <polygon points="12,2 8,8 16,8" fill="#00b4d8"/>
+      const arrowSvg = `<svg width="32" height="32" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r="14" fill="none" stroke="#00b4d8" stroke-width="1" opacity="0.3"/>
+        <g transform="rotate(${wd}, 16, 16)">
+          <line x1="16" y1="28" x2="16" y2="6" stroke="#00b4d8" stroke-width="2.5"/>
+          <polygon points="16,4 11,11 21,11" fill="#00b4d8"/>
         </g>
       </svg>`;
       windEl.querySelector('.map-wind-arrow').innerHTML = arrowSvg;
-      windEl.querySelector('.map-wind-label').textContent = `${Math.round(wd)}`;
+      const valueEl = windEl.querySelector('.map-wind-value');
+      if (valueEl) valueEl.textContent = `${Math.round(wd)}°`;
     }
 
     // Update fleet counter
@@ -265,10 +277,12 @@ export function initInshoreMap(containerId) {
       const labelEl = entry.label.getElement?.();
       if (labelEl && !labelEl.style.transition) labelEl.style.transition = 'transform 100ms linear';
 
-      // Update label text (player name may arrive later from Master)
-      const updatedLabel = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
+      // Update label text — name + speed in knots
+      const nameLabel = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
+      const spdLabel = boat.speedKnots != null && boat.speedKnots > 0 ? ` ${boat.speedKnots.toFixed(1)}kn` : '';
+      const updatedLabel = nameLabel + spdLabel;
       const updatedClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
-      const updatedWidth = Math.max(40, Math.min(updatedLabel.length * 7, 120));
+      const updatedWidth = Math.max(50, Math.min(updatedLabel.length * 7, 140));
       entry.label.setIcon(L.divIcon({
         html: `<span class="${updatedClass}" style="opacity:${opacity}">${updatedLabel}</span>`,
         iconSize: [updatedWidth, 14],
@@ -280,7 +294,7 @@ export function initInshoreMap(containerId) {
       const accTrack = boat.trackHistory;
       const slotTrack = accTrack && accTrack.length > 1 ? accTrack : trackHistory[boat.slot];
       if (slotTrack && slotTrack.length > 1) {
-        const coords = slotTrack.slice(-TRACK_MAX_POINTS).map(p => [-p.y, p.x]);
+        const coords = slotTrack.slice(-TRACK_MAX_POINTS).map(p => [p.x, p.y]);
         entry.trail.setLatLngs(coords);
         entry.trail.setStyle({ color, opacity: isStale ? 0.2 : 0.4 });
       }
