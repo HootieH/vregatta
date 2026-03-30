@@ -82,6 +82,16 @@ export function initInshoreMap(containerId) {
   const markMarkers = new Map();
   let courseLine = null;
 
+  // Course inference layers
+  let startLineLayer = null;
+  let gateLineLayer = null;
+  const gateMarkMarkers = [];
+  let courseAxisLayer = null;
+  let portLaylLayer = null;
+  let stbdLaylLayer = null;
+  let startLabel = null;
+  let gateLabel = null;
+
   // North indicator — top-left corner
   const northEl = document.createElement('div');
   northEl.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1000;pointer-events:none;text-align:center;';
@@ -458,6 +468,192 @@ export function initInshoreMap(containerId) {
     }
   }
 
+  function createDiamondIcon(color, label) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30">
+      <polygon points="12,2 22,12 12,22 2,12" fill="${color}" fill-opacity="0.5" stroke="${color}" stroke-width="2"/>
+      <text x="12" y="29" text-anchor="middle" fill="${color}" font-size="9" font-family="monospace" font-weight="bold">${label}</text>
+    </svg>`;
+    return L.divIcon({
+      html: svg,
+      iconSize: [24, 30],
+      iconAnchor: [12, 15],
+      className: '',
+    });
+  }
+
+  function createCourseLabel(text) {
+    return L.divIcon({
+      html: `<span style="color:#ccc;font-size:10px;font-family:monospace;font-weight:bold;text-shadow:0 0 4px #000,0 0 2px #000">${text}</span>`,
+      iconSize: [50, 14],
+      iconAnchor: [25, -8],
+      className: '',
+    });
+  }
+
+  /**
+   * Draw inferred course features: start line, windward gate, laylines, course axis.
+   *
+   * @param {object} course - from CourseInferrer.getCourse()
+   * @param {Array} marks - from CourseInferrer.getMarks()
+   * @param {object|null} laylines - from CourseInferrer.getLaylines()
+   */
+  function updateCourse(course, marks, laylines) {
+    // --- Start/finish line ---
+    if (course && course.startLine) {
+      const sl = course.startLine;
+      const coords = [[sl.x1, sl.y1], [sl.x2, sl.y2]];
+      if (startLineLayer) {
+        startLineLayer.setLatLngs(coords);
+      } else {
+        startLineLayer = L.polyline(coords, {
+          color: '#ffffff',
+          opacity: 0.7,
+          weight: 2,
+        }).addTo(map);
+      }
+      // Start label at midpoint
+      const midX = (sl.x1 + sl.x2) / 2;
+      const midY = (sl.y1 + sl.y2) / 2;
+      if (startLabel) {
+        startLabel.setLatLng([midX, midY]);
+      } else {
+        startLabel = L.marker([midX, midY], {
+          icon: createCourseLabel('START'),
+          interactive: false,
+        }).addTo(map);
+      }
+    } else {
+      if (startLineLayer) { map.removeLayer(startLineLayer); startLineLayer = null; }
+      if (startLabel) { map.removeLayer(startLabel); startLabel = null; }
+    }
+
+    // --- Windward gate ---
+    if (course && course.windwardGate) {
+      const gate = course.windwardGate;
+
+      // Gate dashed line between pins
+      const gateCoords = [[gate.port.x, gate.port.y], [gate.stbd.x, gate.stbd.y]];
+      if (gateLineLayer) {
+        gateLineLayer.setLatLngs(gateCoords);
+      } else {
+        gateLineLayer = L.polyline(gateCoords, {
+          color: MARK_COLOR,
+          opacity: 0.6,
+          weight: 1.5,
+          dashArray: '6, 4',
+        }).addTo(map);
+      }
+
+      // Gate diamond marks
+      const gatePositions = [
+        { x: gate.port.x, y: gate.port.y, label: 'P' },
+        { x: gate.stbd.x, y: gate.stbd.y, label: 'S' },
+      ];
+      for (let i = 0; i < gatePositions.length; i++) {
+        const gp = gatePositions[i];
+        if (gateMarkMarkers[i]) {
+          gateMarkMarkers[i].setLatLng([gp.x, gp.y]);
+        } else {
+          gateMarkMarkers[i] = L.marker([gp.x, gp.y], {
+            icon: createDiamondIcon(MARK_COLOR, gp.label),
+            interactive: false,
+          }).addTo(map);
+        }
+      }
+
+      // Gate label at midpoint
+      const gateMidX = (gate.port.x + gate.stbd.x) / 2;
+      const gateMidY = (gate.port.y + gate.stbd.y) / 2;
+      if (gateLabel) {
+        gateLabel.setLatLng([gateMidX, gateMidY]);
+      } else {
+        gateLabel = L.marker([gateMidX, gateMidY], {
+          icon: createCourseLabel('GATE'),
+          interactive: false,
+        }).addTo(map);
+      }
+    } else {
+      if (gateLineLayer) { map.removeLayer(gateLineLayer); gateLineLayer = null; }
+      for (const m of gateMarkMarkers) { if (m) map.removeLayer(m); }
+      gateMarkMarkers.length = 0;
+      if (gateLabel) { map.removeLayer(gateLabel); gateLabel = null; }
+    }
+
+    // --- Course axis ---
+    if (course && course.startLine && course.windwardGate) {
+      const sl = course.startLine;
+      const gate = course.windwardGate;
+      const startMid = [(sl.x1 + sl.x2) / 2, (sl.y1 + sl.y2) / 2];
+      const gateMid = [(gate.port.x + gate.stbd.x) / 2, (gate.port.y + gate.stbd.y) / 2];
+      if (courseAxisLayer) {
+        courseAxisLayer.setLatLngs([startMid, gateMid]);
+      } else {
+        courseAxisLayer = L.polyline([startMid, gateMid], {
+          color: '#888888',
+          opacity: 0.25,
+          weight: 1,
+          dashArray: '4, 8',
+        }).addTo(map);
+      }
+    } else {
+      if (courseAxisLayer) { map.removeLayer(courseAxisLayer); courseAxisLayer = null; }
+    }
+
+    // --- Laylines ---
+    if (laylines) {
+      // Port layline (red)
+      if (laylines.port && laylines.port.line.length === 2) {
+        const coords = laylines.port.line.map(p => [p.x, p.y]);
+        if (portLaylLayer) {
+          portLaylLayer.setLatLngs(coords);
+        } else {
+          portLaylLayer = L.polyline(coords, {
+            color: '#ff3333',
+            opacity: 0.4,
+            weight: 1.5,
+            dashArray: '8, 6',
+          }).addTo(map);
+        }
+      }
+      // Starboard layline (green)
+      if (laylines.stbd && laylines.stbd.line.length === 2) {
+        const coords = laylines.stbd.line.map(p => [p.x, p.y]);
+        if (stbdLaylLayer) {
+          stbdLaylLayer.setLatLngs(coords);
+        } else {
+          stbdLaylLayer = L.polyline(coords, {
+            color: '#00e676',
+            opacity: 0.4,
+            weight: 1.5,
+            dashArray: '8, 6',
+          }).addTo(map);
+        }
+      }
+    } else {
+      if (portLaylLayer) { map.removeLayer(portLaylLayer); portLaylLayer = null; }
+      if (stbdLaylLayer) { map.removeLayer(stbdLaylLayer); stbdLaylLayer = null; }
+    }
+
+    // --- Also draw individual inferred marks as diamonds ---
+    if (marks && marks.length > 0) {
+      // Draw mark-2 endpoints as white diamonds if start line isn't drawn yet
+      for (const mark of marks) {
+        if (mark.id === 2 && !course?.startLine) {
+          const key = `inferred-${mark.id}-${mark.endIndex ?? 0}`;
+          if (!markMarkers.has(key)) {
+            const m = L.marker([mark.x, mark.y], {
+              icon: createDiamondIcon('#ffffff', 'S'),
+              interactive: false,
+            }).addTo(map);
+            markMarkers.set(key, m);
+          } else {
+            markMarkers.get(key).setLatLng([mark.x, mark.y]);
+          }
+        }
+      }
+    }
+  }
+
   function resize() {
     map.invalidateSize();
   }
@@ -508,5 +704,5 @@ export function initInshoreMap(containerId) {
   // Start animation loop
   requestAnimationFrame(animate);
 
-  return { update, updateMarks, updateEncounters, resize, windViz, windShadow };
+  return { update, updateMarks, updateCourse, updateEncounters, resize, windViz, windShadow };
 }

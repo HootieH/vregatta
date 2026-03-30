@@ -30,6 +30,7 @@ import { decodeMasterState, decodeMasterUpdate } from './colyseus/master-decoder
 import { FleetManager } from './colyseus/fleet-manager.js';
 import { PlayerDetector } from './colyseus/player-detector.js';
 import { RaceRecorder } from './storage/race-recorder.js';
+import { CourseInferrer } from './colyseus/course-inferrer.js';
 import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } from './telemetry.js';
 
 const log = createLogger('background');
@@ -45,6 +46,8 @@ const state = new LiveState();
 const fleetManager = new FleetManager();
 const playerDetector = new PlayerDetector();
 const masterLog = createLogger('master-decoder');
+const courseInferrer = new CourseInferrer();
+const courseLog = createLogger('course-inferrer');
 
 // Auto-record every Inshore race in background
 const raceRecorder = new RaceRecorder();
@@ -200,6 +203,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const snapshot = state.getSnapshot();
     snapshot.inshoreFleet = fleetManager.getFleet();
     snapshot.inshoreFleetStats = fleetManager.getStats();
+    snapshot.inshoreCourse = courseInferrer.getCourse();
+    snapshot.inshoreMarks = courseInferrer.getMarks();
+    const windDir = snapshot.inshoreWindDirection;
+    if (windDir != null) {
+      snapshot.inshoreLaylines = courseInferrer.getLaylines(windDir);
+    }
     sendResponse(snapshot);
     return true;
   }
@@ -668,10 +677,33 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
       wsLog.debug(`WS room data (size=${data?.size ?? '?'})`, { direction });
       break;
 
+    case 'ws-mark-crossing':
+      if (decoded) {
+        // Get player position from current state
+        const playerBoat = Array.from(state.inshoreBoats.values()).find(b => b.isPlayer);
+        if (playerBoat) {
+          courseInferrer.addCrossing(
+            decoded.markId,
+            decoded.crossingAngle,
+            playerBoat.x,
+            playerBoat.y,
+            playerBoat.heading,
+            state.inshoreTick,
+          );
+          courseLog.info(`Mark crossing: mark=${decoded.markId} pos=(${playerBoat.x.toFixed(0)}, ${playerBoat.y.toFixed(0)}) angle=${decoded.hasAngle ? decoded.crossingAngle.toFixed(1) : 'N/A'}`);
+        } else {
+          courseLog.warn(`Mark crossing mark=${decoded.markId} but no player boat found in state`);
+        }
+      } else {
+        courseLog.warn('Mark crossing without decoded data');
+      }
+      break;
+
     case 'ws-leave':
       wsLog.info('WS leave room', { direction });
-      // Reset player detection for next race
+      // Reset player detection and course inference for next race
       playerDetector.reset();
+      courseInferrer.reset();
       // Auto-stop recording on leave
       if (raceRecorder.isRecording()) {
         raceRecorder.addEvent({ type: 'leave', timestamp: Date.now(), direction });

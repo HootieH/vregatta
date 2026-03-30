@@ -178,6 +178,11 @@ function classifyBinaryWs(data, direction, isMasterServer) {
 
   let type = TYPE_MAP[typeByte] || 'ws-unknown';
 
+  // LEAVE (0x02) from Game server outgoing with enough payload = mark crossing
+  if (typeByte === 0x02 && direction === 'outgoing' && !isMasterServer && payload.length >= 23) {
+    type = 'ws-mark-crossing';
+  }
+
   // Master server: ROOM_STATE (0x04) is uncompressed Colyseus Schema,
   // other types from Master get prefixed with 'ws-master-'
   if (isMasterServer) {
@@ -204,6 +209,17 @@ function classifyBinaryWs(data, direction, isMasterServer) {
       const heading = Math.round((headingRaw * 360 / 65536) * 100) / 100;
       const timestamp = ((payload[14] << 24) >>> 0) + (payload[15] << 16) + (payload[16] << 8) + payload[17];
       decoded = { heading, headingRaw, timestamp };
+    } else if (typeByte === 0x02 && payload.length >= 23) {
+      // Mark crossing — markId at payload[20], float32 BE at payload[21..24]
+      const markId = payload[20];
+      const dv = new DataView(payload.buffer, payload.byteOffset + 21, 4);
+      const crossingAngle = dv.getFloat32(0, false);
+      const hasAngle = !isNaN(crossingAngle);
+      decoded = {
+        markId,
+        crossingAngle: hasAngle ? Math.round(crossingAngle * 100) / 100 : NaN,
+        hasAngle,
+      };
     }
   } catch {
     // Best-effort decode — failure is OK

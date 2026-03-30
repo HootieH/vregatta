@@ -132,7 +132,13 @@ function poll() {
       }
 
       // --- Feed map ---
-      if (raceMap) raceMap.update(snapshot);
+      if (raceMap) {
+        raceMap.update(snapshot);
+        // Draw inferred course marks, start line, gate, laylines
+        if (snapshot.inshoreCourse || snapshot.inshoreMarks?.length > 0) {
+          raceMap.updateCourse(snapshot.inshoreCourse, snapshot.inshoreMarks, snapshot.inshoreLaylines);
+        }
+      }
 
       // --- Feed instruments ---
       if (instruments) instruments.update(snapshot);
