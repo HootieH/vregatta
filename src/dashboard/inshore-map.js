@@ -130,22 +130,31 @@ export function initInshoreMap(containerId) {
   let firstUpdate = true;
 
   // --- Interpolation state per boat ---
-  // Each boat stores: {prevX, prevY, prevHdg, targetX, targetY, targetHdg, startTime, duration}
+  // Smooth boat motion: interpolate between known positions at 60fps.
+  // Duration adapts to actual data rate (time between received updates).
   const interpState = new Map();
-  const INTERP_DURATION = 120; // ms — time to interpolate between updates (matches ~8fps data rate)
+  const DEFAULT_INTERP_MS = 150;
+  const MIN_INTERP_MS = 50;
+  const MAX_INTERP_MS = 500;
 
   function lerpAngle(a, b, t) {
     let delta = b - a;
     if (delta > 180) delta -= 360;
     if (delta < -180) delta += 360;
-    return a + delta * t;
+    return ((a + delta * t) % 360 + 360) % 360;
+  }
+
+  function easeOut(t) {
+    // Smooth deceleration for more natural motion
+    return 1 - (1 - t) * (1 - t);
   }
 
   function getInterpolated(slot, now) {
     const s = interpState.get(slot);
     if (!s) return null;
     const elapsed = now - s.startTime;
-    const t = Math.min(elapsed / s.duration, 1);
+    const rawT = Math.min(elapsed / s.duration, 1);
+    const t = easeOut(rawT);
     return {
       x: s.prevX + (s.targetX - s.prevX) * t,
       y: s.prevY + (s.targetY - s.prevY) * t,
@@ -154,11 +163,24 @@ export function initInshoreMap(containerId) {
   }
 
   function setTarget(slot, x, y, heading) {
-    const existing = interpState.get(slot);
     const now = performance.now();
+    const existing = interpState.get(slot);
+
     if (existing) {
-      // Start interpolating from current interpolated position
+      // Adapt duration to actual data arrival rate
+      const timeSinceLastUpdate = now - existing.startTime;
+      const adaptiveDuration = Math.max(MIN_INTERP_MS, Math.min(MAX_INTERP_MS, timeSinceLastUpdate * 1.2));
+
+      // Start from current interpolated position (not raw previous)
       const current = getInterpolated(slot, now);
+
+      // Skip tiny movements (sub-pixel jitter)
+      const dx = x - (current?.x ?? x);
+      const dy = y - (current?.y ?? y);
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2 && Math.abs(heading - (current?.heading ?? heading)) < 0.5) {
+        return; // no meaningful change — don't reset interpolation
+      }
+
       interpState.set(slot, {
         prevX: current?.x ?? x,
         prevY: current?.y ?? y,
@@ -167,15 +189,14 @@ export function initInshoreMap(containerId) {
         targetY: y,
         targetHdg: heading,
         startTime: now,
-        duration: INTERP_DURATION,
+        duration: adaptiveDuration,
       });
     } else {
-      // First time — snap to position
       interpState.set(slot, {
         prevX: x, prevY: y, prevHdg: heading,
         targetX: x, targetY: y, targetHdg: heading,
         startTime: now,
-        duration: INTERP_DURATION,
+        duration: DEFAULT_INTERP_MS,
       });
     }
   }
@@ -443,6 +464,7 @@ export function initInshoreMap(containerId) {
 
   // --- 60fps animation loop for smooth boat interpolation ---
   let lastIconUpdate = new Map(); // slot -> {heading, color}
+  let lastMarkerPos = new Map();  // slot -> {x, y} — track to avoid redundant setLatLng
 
   function animate() {
     const now = performance.now();
@@ -450,14 +472,20 @@ export function initInshoreMap(containerId) {
       const interp = getInterpolated(slot, now);
       if (!interp) continue;
 
-      const pos = [interp.x, interp.y];
-      entry.marker.setLatLng(pos);
-      entry.label.setLatLng(pos);
+      // Only call setLatLng if position actually moved (>0.5 game units)
+      const lastPos = lastMarkerPos.get(slot);
+      const moved = !lastPos || Math.abs(interp.x - lastPos.x) > 0.5 || Math.abs(interp.y - lastPos.y) > 0.5;
+      if (moved) {
+        const pos = [interp.x, interp.y];
+        entry.marker.setLatLng(pos);
+        entry.label.setLatLng(pos);
+        lastMarkerPos.set(slot, { x: interp.x, y: interp.y });
+      }
 
-      // Only rebuild icon when heading changes by >2° or color changed
+      // Only rebuild icon when heading changes by >3° or color changed
       const last = lastIconUpdate.get(slot);
       const hdgRounded = Math.round(interp.heading);
-      if (!last || Math.abs(last.heading - hdgRounded) >= 2 || last.color !== entry.color) {
+      if (!last || Math.abs(last.heading - hdgRounded) >= 3 || last.color !== entry.color) {
         entry.marker.setIcon(createBoatIcon(hdgRounded, entry.color, entry.size, entry.opacity));
         lastIconUpdate.set(slot, { heading: hdgRounded, color: entry.color });
       }
