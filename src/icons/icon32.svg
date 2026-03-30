@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="5" fill="#0a0a1a"/>
+  <!-- Main sail -->
+  <path d="M16 4 Q22 10 20 18 L16 22 Z" fill="#3a86ff" opacity="0.95"/>
+  <!-- Jib -->
+  <path d="M16 6 Q11 12 12 18 L16 21 Z" fill="#00b4d8" opacity="0.85"/>
+  <!-- Mast -->
+  <line x1="16" y1="4" x2="16" y2="24" stroke="#c0c0c0" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Hull -->
+  <path d="M11 23 Q13 26 16 26 Q19 26 21 23 Z" fill="#e0e0e0" opacity="0.8"/>
+  <!-- Water -->
+  <path d="M2 26 Q8 23.5 16 26 Q24 28.5 30 26 L30 32 L2 32 Z" fill="#0d1f3c" opacity="0.6"/>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <rect width="16" height="16" rx="3" fill="#0a0a1a"/>
+  <!-- Simplified sail shape - reads well at 16px -->
+  <path d="M8 2 L11 7 L8 12 Z" fill="#3a86ff"/>
+  <path d="M8 3 L5.5 7.5 L8 11 Z" fill="#00b4d8"/>
+  <!-- Water line -->
+  <path d="M2 12 Q5 10.5 8 12 Q11 13.5 14 12 L14 16 L2 16 Z" fill="#0d1f3c" opacity="0.6"/>
+  <!-- Mast -->
+  <line x1="8" y1="2" x2="8" y2="13" stroke="#c0c0c0" stroke-width="0.8"/>
+</svg>

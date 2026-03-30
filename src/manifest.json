@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "vRegatta",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Virtual Regatta sailing tools — data capture & analytics",
   "permissions": ["storage", "scripting", "activeTab", "tabs"],
   "background": {
@@ -22,6 +22,9 @@
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
+      "16": "icons/icon16.svg",
+      "32": "icons/icon32.svg",
+      "48": "icons/icon48.svg",
       "128": "icons/icon128.svg"
     }
   },
@@ -47,6 +50,9 @@
     }
   ],
   "icons": {
+    "16": "icons/icon16.svg",
+    "32": "icons/icon32.svg",
+    "48": "icons/icon48.svg",
     "128": "icons/icon128.svg"
   }
 }

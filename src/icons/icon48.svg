@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="s1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a86ff"/>
+      <stop offset="100%" stop-color="#1a5ccc"/>
+    </linearGradient>
+    <linearGradient id="s2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00b4d8"/>
+      <stop offset="100%" stop-color="#0077b6"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="8" fill="#0a0a1a"/>
+  <!-- Main sail -->
+  <path d="M24 7 Q34 16 30 26 Q28 32 24 34 Z" fill="url(#s1)" opacity="0.95"/>
+  <!-- Jib -->
+  <path d="M24 9 Q16 18 17 26 Q18 30 24 33 Z" fill="url(#s2)" opacity="0.85"/>
+  <!-- Mast -->
+  <line x1="24" y1="7" x2="24" y2="36" stroke="#c0c0c0" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Hull -->
+  <path d="M17 35 Q20 39 24 39 Q28 39 31 35 Z" fill="#e0e0e0" opacity="0.85"/>
+  <!-- Water -->
+  <path d="M2 38 Q10 35 18 38 Q26 41 34 38 Q42 35 46 38 L46 48 L2 48 Z" fill="#0d1f3c" opacity="0.6"/>
+  <path d="M2 42 Q10 39 18 42 Q26 45 34 42 Q42 39 46 42 L46 48 L2 48 Z" fill="#0d1f3c" opacity="0.3"/>
+</svg>

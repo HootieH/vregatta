@@ -1,8 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <rect width="128" height="128" rx="16" fill="#1a1a2e"/>
-  <path d="M64 20 L64 108" stroke="#3a86ff" stroke-width="3" stroke-linecap="round"/>
-  <path d="M64 20 Q95 45 64 80" fill="#3a86ff" opacity="0.9"/>
-  <path d="M64 50 Q40 70 64 95" fill="#8338ec" opacity="0.7"/>
-  <path d="M20 100 Q45 85 64 108 Q83 85 108 100" fill="none" stroke="#00b4d8" stroke-width="2.5" opacity="0.6"/>
-  <path d="M15 108 Q40 93 64 113 Q88 93 113 108" fill="none" stroke="#00b4d8" stroke-width="2" opacity="0.4"/>
+  <defs>
+    <linearGradient id="sail1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a86ff"/>
+      <stop offset="100%" stop-color="#1a5ccc"/>
+    </linearGradient>
+    <linearGradient id="sail2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00b4d8"/>
+      <stop offset="100%" stop-color="#0077b6"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1628"/>
+      <stop offset="100%" stop-color="#0d1f3c"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="128" height="128" rx="20" fill="#0a0a1a"/>
+  <!-- Water -->
+  <path d="M0 88 Q16 82 32 88 Q48 94 64 88 Q80 82 96 88 Q112 94 128 88 L128 128 L0 128 Z" fill="url(#sea)" opacity="0.8"/>
+  <path d="M0 96 Q16 90 32 96 Q48 102 64 96 Q80 90 96 96 Q112 102 128 96 L128 128 L0 128 Z" fill="url(#sea)" opacity="0.5"/>
+  <!-- Hull -->
+  <path d="M44 86 Q50 94 64 94 Q78 94 84 86 Z" fill="#e0e0e0" opacity="0.9"/>
+  <!-- Mast -->
+  <line x1="64" y1="24" x2="64" y2="88" stroke="#c0c0c0" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Main sail -->
+  <path d="M64 26 Q88 42 82 68 Q76 80 64 86 Z" fill="url(#sail1)" opacity="0.95"/>
+  <!-- Jib -->
+  <path d="M64 30 Q44 48 46 66 Q48 76 64 82 Z" fill="url(#sail2)" opacity="0.85"/>
+  <!-- Wind indicator - small arrow top-right -->
+  <g transform="translate(100, 22) rotate(180)">
+    <line x1="0" y1="-8" x2="0" y2="8" stroke="#00b4d8" stroke-width="1.5" opacity="0.7"/>
+    <polygon points="0,-10 -4,-4 4,-4" fill="#00b4d8" opacity="0.7"/>
+  </g>
+  <!-- Heading line from bow -->
+  <line x1="64" y1="24" x2="64" y2="10" stroke="#00ff41" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
+  <!-- V text mark -->
+  <text x="18" y="28" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="900" fill="#3a86ff" opacity="0.8">V</text>
+  <text x="14" y="44" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" fill="#00b4d8" opacity="0.6">R</text>
 </svg>
