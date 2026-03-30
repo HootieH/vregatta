@@ -10,12 +10,14 @@ import { initInshoreInstruments } from './inshore-instruments.js';
 import { initInshoreEvents } from './inshore-events.js';
 import { initRulesPanel } from './rules-panel.js';
 import { detectEncounters } from '../rules/encounter-detector.js';
+import { initCapture } from './capture.js';
 
 // --- Initialize components ---
 const raceMap = initInshoreMap('race-map');
 const instruments = initInshoreInstruments('instrument-bar');
 const rulesPanel = initRulesPanel('rules-sidebar');
 const events = initInshoreEvents('rules-sidebar');
+const capture = initCapture();
 
 // Mark detection disabled — was producing noisy jumping marks
 
@@ -186,4 +188,54 @@ poll();
 // Handle window resize
 window.addEventListener('resize', () => {
   if (raceMap) raceMap.resize();
+});
+
+// --- Capture controls ---
+const captureBtn = document.getElementById('capture-btn');
+const captureRecording = document.getElementById('capture-recording');
+const captureFrameCount = document.getElementById('capture-frame-count');
+const captureStopBtn = document.getElementById('capture-stop-btn');
+const shutterFlash = document.getElementById('shutter-flash');
+
+function flashShutter() {
+  if (!shutterFlash) return;
+  shutterFlash.classList.add('flash');
+  setTimeout(() => shutterFlash.classList.remove('flash'), 100);
+}
+
+if (captureBtn) {
+  captureBtn.addEventListener('click', async (e) => {
+    if (e.shiftKey) {
+      // Shift+click: start sequence capture
+      if (!capture.isRecording()) {
+        capture.startSequence(2000);
+      }
+    } else {
+      // Normal click: single capture
+      flashShutter();
+      await capture.captureBundle();
+    }
+  });
+}
+
+if (captureStopBtn) {
+  captureStopBtn.addEventListener('click', () => {
+    capture.stopSequence();
+  });
+}
+
+// Listen for capture events
+window.addEventListener('capture-sequence-start', () => {
+  if (captureRecording) captureRecording.classList.remove('hidden');
+  if (captureFrameCount) captureFrameCount.textContent = '0/30';
+});
+
+window.addEventListener('capture-sequence-stop', () => {
+  if (captureRecording) captureRecording.classList.add('hidden');
+});
+
+window.addEventListener('capture-frame', (e) => {
+  const { frameCount, maxFrames } = e.detail;
+  if (captureFrameCount) captureFrameCount.textContent = `${frameCount}/${maxFrames}`;
+  flashShutter();
 });

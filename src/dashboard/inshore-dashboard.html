@@ -13,6 +13,19 @@
     <div id="rules-sidebar"></div>
     <div id="instrument-bar"></div>
     <div id="events-panel"></div>
+    <!-- Capture controls -->
+    <div id="capture-controls">
+      <button id="capture-btn" title="Click: capture screenshot + state&#10;Shift+click: start sequence capture">
+        <span class="capture-icon">&#128247;</span>
+      </button>
+      <div id="capture-recording" class="capture-recording hidden">
+        <span class="rec-dot"></span>
+        <span id="capture-frame-count">0/30</span>
+        <button id="capture-stop-btn" title="Stop recording">Stop</button>
+      </div>
+    </div>
+    <!-- Shutter flash overlay -->
+    <div id="shutter-flash"></div>
     <div id="waiting-overlay">
       <div class="waiting-content">
         <div class="waiting-icon">&#9973;</div>

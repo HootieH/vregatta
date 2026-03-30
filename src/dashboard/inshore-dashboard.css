@@ -414,6 +414,112 @@ html, body {
   font-size: 11px;
 }
 
+/* ---- Capture Controls ---- */
+#capture-controls {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#capture-btn {
+  background: rgba(10, 10, 26, 0.85);
+  border: 1px solid #2a2a4a;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+#capture-btn:hover {
+  background: rgba(58, 134, 255, 0.2);
+  border-color: #3a86ff;
+}
+
+#capture-btn:active {
+  background: rgba(58, 134, 255, 0.4);
+}
+
+.capture-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.capture-recording {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 10, 26, 0.9);
+  border: 1px solid #ff3333;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #ff3333;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.capture-recording.hidden {
+  display: none;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  background: #ff3333;
+  border-radius: 50%;
+  animation: rec-blink 1s ease-in-out infinite;
+}
+
+@keyframes rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+#capture-stop-btn {
+  background: transparent;
+  border: 1px solid #ff3333;
+  color: #ff3333;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+}
+
+#capture-stop-btn:hover {
+  background: #ff3333;
+  color: #fff;
+}
+
+/* Shutter flash */
+#shutter-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.05s ease-out;
+}
+
+#shutter-flash.flash {
+  opacity: 0.6;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 800px) {
   #inshore-app {
