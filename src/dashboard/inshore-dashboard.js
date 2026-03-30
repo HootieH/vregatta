@@ -10,8 +10,6 @@ import { initInshoreInstruments } from './inshore-instruments.js';
 import { initInshoreEvents } from './inshore-events.js';
 import { initRulesPanel } from './rules-panel.js';
 import { detectEncounters } from '../rules/encounter-detector.js';
-import { detectMarks, detectCurrentLeg, isApproachingMark } from '../colyseus/mark-detector.js';
-import { createStateHistory } from '../colyseus/inshore-pipeline.js';
 
 // --- Initialize components ---
 const raceMap = initInshoreMap('race-map');
@@ -19,11 +17,7 @@ const instruments = initInshoreInstruments('instrument-bar');
 const rulesPanel = initRulesPanel('rules-sidebar');
 const events = initInshoreEvents('rules-sidebar');
 
-// State history for mark detection
-const stateHistory = createStateHistory(500);
-let detectedMarks = [];
-let lastMarkDetection = 0;
-const MARK_DETECTION_INTERVAL = 2000;
+// Mark detection disabled — was producing noisy jumping marks
 
 // Fleet count display
 const fleetCountEl = document.getElementById('fleet-count');
@@ -137,41 +131,12 @@ function poll() {
       }
 
       // --- Mark detection ---
+      // DISABLED: mark inference from turning patterns was producing noisy results
+      // with jumping positions. Needs rework with corrected coordinate system
+      // (X=North, Y=East). Will re-enable once we have a reliable detection algorithm
+      // or find marks in the protocol data.
       const now = Date.now();
-      const stateForHistory = {
-        tick: snapshot.inshoreTick ?? now,
-        boats: snapshot.inshoreBoats,
-      };
-      stateHistory.push(stateForHistory);
-
-      if (now - lastMarkDetection >= MARK_DETECTION_INTERVAL) {
-        lastMarkDetection = now;
-        const result = detectMarks(stateHistory.getHistory());
-        detectedMarks = result.marks;
-
-        const player = snapshot.inshorePlayerBoat;
-        if (player && detectedMarks.length > 0) {
-          const legInfo = detectCurrentLeg(player, detectedMarks);
-
-          // Mark approach alert
-          if (legInfo.nextMark && isApproachingMark(player, legInfo.nextMark)) {
-            if (legInfo.distanceToMark < 1500) {
-              const markAlert = {
-                rule: 'mark',
-                otherBoat: null,
-                distance: legInfo.distanceToMark,
-                situation: 'mark_approach',
-                playerRole: null,
-                urgency: legInfo.distanceToMark < 500 ? 'critical' : 'high',
-                description: `Approaching ${legInfo.nextMark.id} (${legInfo.distanceToMark} units)`,
-              };
-              encounters = [markAlert, ...encounters];
-            }
-          }
-        }
-
-        if (raceMap) raceMap.updateMarks(detectedMarks);
-      }
+      void now; // keep for other uses
 
       // Feed fleet names and rules panel — THROTTLED to prevent layout thrashing
       if (rulesPanel) {
