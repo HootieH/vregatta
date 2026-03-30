@@ -103,9 +103,17 @@ export class LiveState {
     let changed = false;
     this.inshoreTick = normalizedState.tick;
 
+    // Wind data from Inshore state (field 4 = direction, field 6 = speed)
+    if (normalizedState.windDirection != null) {
+      this.inshoreWindDirection = normalizedState.windDirection;
+    }
+    if (normalizedState.windSpeed != null) {
+      this.inshoreWindSpeed = normalizedState.windSpeed;
+    }
+
     for (const boat of normalizedState.boats) {
       const prev = this.inshoreBoats.get(boat.slot);
-      if (!prev || prev.heading !== boat.heading || prev.x !== boat.x || prev.y !== boat.y) {
+      if (!prev || prev.heading !== boat.heading || prev.x !== boat.x || prev.y !== boat.y || prev.speedRaw !== boat.speedRaw) {
         changed = true;
       }
       this.inshoreBoats.set(boat.slot, boat);
@@ -115,16 +123,23 @@ export class LiveState {
   }
 
   getSnapshot() {
+    const playerBoat = this.inshoreBoats.size > 0
+      ? Array.from(this.inshoreBoats.values()).find(b => b.isPlayer) ?? null
+      : null;
+
     return {
       boat: this.boat,
       race: this.race,
       competitorCount: this.competitors.size,
       vmg: this.computeVMG(this.boat),
       events: this.events.slice(-5),
-      connected: this.boat !== null,
+      connected: this.boat !== null || this.inshoreBoats.size > 0,
       inshoreBoats: Array.from(this.inshoreBoats.values()),
       inshoreTick: this.inshoreTick,
       inshoreActive: this.inshoreBoats.size > 0,
+      inshoreWindDirection: this.inshoreWindDirection ?? null,
+      inshoreWindSpeed: this.inshoreWindSpeed ?? null,
+      inshorePlayerBoat: playerBoat,
     };
   }
 }
