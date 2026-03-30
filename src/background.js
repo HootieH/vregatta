@@ -48,10 +48,12 @@ const playerDetector = new PlayerDetector();
 const masterLog = createLogger('master-decoder');
 const courseInferrer = new CourseInferrer();
 const courseLog = createLogger('course-inferrer');
+const unityScanLog = createLogger('unity-scanner');
 
 // Auto-record every Inshore race in background
 const raceRecorder = new RaceRecorder();
 let raceAutoStarted = false;
+let unityScanTriggered = false;
 
 // Initialize DB — wrapped to avoid top-level await crash in some Chrome versions
 (async () => {
@@ -186,6 +188,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const connType = message.url?.includes('Master') ? 'MASTER' : message.url?.includes('Game') ? 'GAME' : 'UNKNOWN';
     log.info(`WS ${connType} connected: ${message.url} (${stats.inshoreConnectionUrls.size} total connections)`);
     autoEnableRawCapture('WebSocket connected — capturing from start');
+    return false;
+  }
+
+  if (message.type === 'unity-scan') {
+    detectedInshore = true;
+    handleUnityScanResults(message.data);
     return false;
   }
 
@@ -621,6 +629,11 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
             }
           }
 
+          // Trigger Unity memory scan after first state with 10+ boats
+          if (!unityScanTriggered && normalized.boats.length >= 10) {
+            triggerUnityScan(normalized.boats);
+          }
+
           // Auto-record race in background
           if (!raceAutoStarted && normalized.boats.length > 0) {
             raceAutoStarted = true;
@@ -701,9 +714,10 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
 
     case 'ws-leave':
       wsLog.info('WS leave room', { direction });
-      // Reset player detection and course inference for next race
+      // Reset player detection, course inference, and scan trigger for next race
       playerDetector.reset();
       courseInferrer.reset();
+      unityScanTriggered = false;
       // Auto-stop recording on leave
       if (raceRecorder.isRecording()) {
         raceRecorder.addEvent({ type: 'leave', timestamp: Date.now(), direction });
@@ -755,6 +769,71 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
   }
 
   updateBadge();
+}
+
+// --- Unity memory scan handling ---
+function handleUnityScanResults(data) {
+  if (!data) {
+    unityScanLog.warn('Received empty unity scan results');
+    return;
+  }
+
+  unityScanLog.info('Unity scan results received', {
+    heapMB: data.heapSizeMB,
+    knownBoats: data.knownBoatCount,
+    f32RawCandidates: data.float32?.rawCandidates,
+    f32Clusters: data.float32?.clusters?.length,
+    f32ScanMs: data.float32?.scanTimeMs,
+    i16RawCandidates: data.int16?.rawCandidates,
+    i16Clusters: data.int16?.clusters?.length,
+    i16ScanMs: data.int16?.scanTimeMs,
+    stringHits: data.strings?.length,
+  });
+
+  // Log top float32 clusters (likely mark positions)
+  if (data.float32?.clusters?.length > 0) {
+    const top = data.float32.clusters.slice(0, 10);
+    unityScanLog.info('Top float32 clusters (possible marks):', top.map(c =>
+      `(${c.x.toFixed(0)}, ${c.y.toFixed(0)}) hits=${c.count}`
+    ));
+  }
+
+  // Log top int16 clusters
+  if (data.int16?.clusters?.length > 0) {
+    const top = data.int16.clusters.slice(0, 10);
+    unityScanLog.info('Top int16 clusters (possible marks):', top.map(c =>
+      `(${c.x.toFixed(0)}, ${c.y.toFixed(0)}) hits=${c.count}`
+    ));
+  }
+
+  // Log string hits
+  if (data.strings?.length > 0) {
+    unityScanLog.info('String matches in WASM heap:', data.strings.slice(0, 20).map(s =>
+      `"${s.term}" @ offset ${s.offset}: ${s.context}`
+    ));
+  }
+}
+
+function triggerUnityScan(boats) {
+  if (unityScanTriggered) return;
+  unityScanTriggered = true;
+
+  const positions = boats.map(b => ({ x: b.x, y: b.y, slot: b.slot }));
+
+  unityScanLog.info('Triggering Unity scan with ' + positions.length + ' known boat positions');
+
+  chrome.tabs.query({ url: '*://play.inshore.virtualregatta.com/*' }, (tabs) => {
+    for (const tab of tabs) {
+      try {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'triggerUnityScan',
+          boatPositions: positions,
+        });
+      } catch (err) {
+        unityScanLog.warn('Failed to send scan trigger to tab ' + tab.id + ': ' + err.message);
+      }
+    }
+  });
 }
 
 log.info('vRegatta background service worker loaded');

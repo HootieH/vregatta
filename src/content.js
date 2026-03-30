@@ -45,6 +45,15 @@ window.addEventListener('message', (event) => {
     return;
   }
 
+  // Forward Unity memory scan results
+  if (event.data.type === 'vr-unity-scan') {
+    chrome.runtime.sendMessage({
+      type: 'unity-scan',
+      data: event.data.data,
+    });
+    return;
+  }
+
   if (event.data.type !== 'vr-intercepted') return;
 
   chrome.runtime.sendMessage({
@@ -54,9 +63,17 @@ window.addEventListener('message', (event) => {
   });
 });
 
-// Listen for debug panel toggle from background
+// Listen for messages from background
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'toggleDebug') {
     toggleDebugPanel();
+  }
+
+  // Forward scan trigger from background to page context
+  if (message.type === 'triggerUnityScan') {
+    window.postMessage({
+      type: 'vr-scan-trigger',
+      boatPositions: message.boatPositions,
+    }, '*');
   }
 });

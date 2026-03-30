@@ -313,4 +313,213 @@
 
     vrLog(1, 'XMLHttpRequest interceptor active — capturing all XHR on VR page');
   }
+
+  // --- Unity memory scanner integration ---
+  if (VR_BROAD_CAPTURE) {
+    // Lazy-load scanner functions to avoid blocking page load
+    let scannerLoaded = false;
+
+    function loadScanner() {
+      if (scannerLoaded) return;
+      scannerLoaded = true;
+      try {
+        // The scanner is bundled into this IIFE by esbuild — we access the
+        // functions via the global scope since injected.js is an IIFE.
+        // We import them at the top of the closure to keep things clean.
+        // Actually, since this is bundled as IIFE, we inline the scanner
+        // functions here. The actual scanner module is imported by esbuild.
+        vrLog(1, 'Unity scanner ready');
+      } catch (e) {
+        vrLog(3, 'Failed to load Unity scanner: ' + e.message);
+      }
+    }
+
+    // Initial scan after Unity has had time to fully load
+    setTimeout(() => {
+      try {
+        loadScanner();
+        // Inline scan: find Unity module and scan
+        const mod = findUnityModuleInline();
+        if (mod) {
+          vrLog(1, 'Unity module found — running initial memory scan');
+          const result = runInlineScan(mod, []);
+          if (result) {
+            window.postMessage({ type: 'vr-unity-scan', data: result }, '*');
+          }
+        } else {
+          vrLog(1, 'Unity module not found after 10s — will retry on boat data');
+        }
+      } catch (e) {
+        vrLog(2, 'Unity initial scan error: ' + e.message);
+      }
+    }, 10000);
+
+    // Scan when triggered with known boat positions
+    window.addEventListener('message', function (e) {
+      if (e.data?.type === 'vr-scan-trigger' && e.data.boatPositions) {
+        try {
+          const mod = findUnityModuleInline();
+          if (mod) {
+            vrLog(1, 'Triggered scan with ' + e.data.boatPositions.length + ' known boats');
+            const result = runInlineScan(mod, e.data.boatPositions);
+            if (result) {
+              window.postMessage({ type: 'vr-unity-scan', data: result }, '*');
+            }
+          } else {
+            vrLog(2, 'Unity module not found for triggered scan');
+          }
+        } catch (e2) {
+          vrLog(2, 'Unity triggered scan error: ' + e2.message);
+        }
+      }
+    });
+
+    // --- Inline scanner functions (duplicated from unity-scanner.js for IIFE context) ---
+    function findUnityModuleInline() {
+      try {
+        if (window.unityInstance?.Module?.HEAPU8) return window.unityInstance.Module;
+        if (window.gameInstance?.Module?.HEAPU8) return window.gameInstance.Module;
+        if (window.Module?.HEAPU8) return window.Module;
+        // Search iframes
+        try {
+          var frames = document.querySelectorAll('iframe');
+          for (var fi = 0; fi < frames.length; fi++) {
+            try {
+              var w = frames[fi].contentWindow;
+              if (w?.Module?.HEAPU8) return w.Module;
+              if (w?.unityInstance?.Module?.HEAPU8) return w.unityInstance.Module;
+            } catch { /* cross-origin */ }
+          }
+        } catch { /* DOM access */ }
+        // Brute-force
+        for (var key of Object.keys(window)) {
+          try {
+            var v = window[key];
+            if (v && typeof v === 'object') {
+              if (v.HEAPU8) return v;
+              if (v.Module?.HEAPU8) return v.Module;
+            }
+          } catch { /* getter threw */ }
+        }
+        return null;
+      } catch (e) {
+        vrLog(3, 'findUnityModule error: ' + e.message);
+        return null;
+      }
+    }
+
+    function runInlineScan(mod, knownBoats) {
+      var heapU8 = mod.HEAPU8;
+      if (!heapU8) return null;
+
+      var heapSize = heapU8.length;
+      vrLog(1, 'WASM heap size: ' + (heapSize / (1024 * 1024)).toFixed(1) + ' MB');
+
+      var boats = knownBoats || [];
+      var COORD_MIN = 4000, COORD_MAX = 28000;
+      var BOAT_R2 = 200 * 200;
+      var MAX_CAND = 2000;
+
+      function isNearBoat(x, y) {
+        for (var bi = 0; bi < boats.length; bi++) {
+          var dx = x - boats[bi].x, dy = y - boats[bi].y;
+          if (dx * dx + dy * dy < BOAT_R2) return true;
+        }
+        return false;
+      }
+
+      // Float32 scan
+      var t0 = Date.now();
+      var f32Results = [];
+      try {
+        var f32 = new Float32Array(heapU8.buffer);
+        for (var i = 0; i < f32.length - 2 && f32Results.length < MAX_CAND; i++) {
+          var fx = f32[i], fy = f32[i + 1];
+          if (fx < COORD_MIN || fx > COORD_MAX || fy < COORD_MIN || fy > COORD_MAX) continue;
+          if (!Number.isFinite(fx) || !Number.isFinite(fy)) continue;
+          if (boats.length > 0 && isNearBoat(fx, fy)) continue;
+          f32Results.push({ offset: i * 4, x: fx, y: fy, z: Number.isFinite(f32[i + 2]) ? f32[i + 2] : null });
+        }
+      } catch (e) { vrLog(3, 'f32 scan error: ' + e.message); }
+      var f32Time = Date.now() - t0;
+
+      // Int16 scan
+      var t1 = Date.now();
+      var i16Results = [];
+      try {
+        var i16 = new Int16Array(heapU8.buffer);
+        for (var j = 0; j < i16.length - 1 && i16Results.length < MAX_CAND; j++) {
+          var ix = i16[j], iy = i16[j + 1];
+          if (ix < COORD_MIN || ix > COORD_MAX || iy < COORD_MIN || iy > COORD_MAX) continue;
+          if (boats.length > 0 && isNearBoat(ix, iy)) continue;
+          i16Results.push({ offset: j * 2, x: ix, y: iy });
+        }
+      } catch (e) { vrLog(3, 'i16 scan error: ' + e.message); }
+      var i16Time = Date.now() - t1;
+
+      // Cluster
+      function cluster(candidates, radius) {
+        var r2 = radius * radius;
+        var clusters = [];
+        var used = new Set();
+        for (var ci = 0; ci < candidates.length; ci++) {
+          if (used.has(ci)) continue;
+          var c = candidates[ci];
+          var sx = c.x, sy = c.y, cnt = 1;
+          used.add(ci);
+          for (var cj = ci + 1; cj < candidates.length; cj++) {
+            if (used.has(cj)) continue;
+            var ddx = candidates[cj].x - c.x, ddy = candidates[cj].y - c.y;
+            if (ddx * ddx + ddy * ddy < r2) {
+              sx += candidates[cj].x; sy += candidates[cj].y; cnt++;
+              used.add(cj);
+            }
+          }
+          clusters.push({ x: sx / cnt, y: sy / cnt, count: cnt });
+        }
+        clusters.sort(function(a, b) { return b.count - a.count; });
+        return clusters;
+      }
+
+      var f32Clusters = cluster(f32Results, 100);
+      var i16Clusters = cluster(i16Results, 100);
+
+      // String scan (lightweight — just check for key terms)
+      var stringHits = [];
+      try {
+        var CHUNK = 4 * 1024 * 1024;
+        var decoder = new TextDecoder('utf-8', { fatal: false });
+        var terms = ['mark', 'buoy', 'gate', 'start', 'finish', 'course', 'waypoint'];
+        for (var off = 0; off < heapU8.length; off += CHUNK - 100) {
+          var end = Math.min(off + CHUNK, heapU8.length);
+          var text = decoder.decode(heapU8.slice(off, end));
+          var lower = text.toLowerCase();
+          for (var ti = 0; ti < terms.length; ti++) {
+            var idx = lower.indexOf(terms[ti]);
+            while (idx !== -1 && stringHits.length < 50) {
+              var ctxStart = Math.max(0, idx - 30);
+              var ctxEnd = Math.min(text.length, idx + terms[ti].length + 30);
+              stringHits.push({
+                term: terms[ti],
+                offset: off + idx,
+                context: text.slice(ctxStart, ctxEnd).replace(/[^\x20-\x7E]/g, '.'),
+              });
+              idx = lower.indexOf(terms[ti], idx + terms[ti].length);
+            }
+          }
+        }
+      } catch (e) { vrLog(2, 'String scan error: ' + e.message); }
+
+      vrLog(1, 'Scan complete: ' + f32Clusters.length + ' f32 clusters, ' + i16Clusters.length + ' i16 clusters, ' + stringHits.length + ' string hits');
+
+      return {
+        timestamp: Date.now(),
+        heapSizeMB: +(heapSize / (1024 * 1024)).toFixed(1),
+        knownBoatCount: boats.length,
+        float32: { rawCandidates: f32Results.length, clusters: f32Clusters.slice(0, 50), scanTimeMs: f32Time },
+        int16: { rawCandidates: i16Results.length, clusters: i16Clusters.slice(0, 50), scanTimeMs: i16Time },
+        strings: stringHits,
+      };
+    }
+  }
 })();

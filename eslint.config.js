@@ -36,6 +36,7 @@ export default [
         btoa: 'readonly',
         Buffer: 'readonly',
         TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
         DecompressionStream: 'readonly',
         require: 'readonly',
       },
