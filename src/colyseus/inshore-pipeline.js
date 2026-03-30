@@ -9,7 +9,7 @@
  *   Field 1  = server tick (~125/sec)
  *   Field 2  = race event code ([0]=normal, [2]=tacking event, [32]/[3]/[4]=other)
  *   Field 3  = per-boat tack direction flags (-1=port tack, 0=straight, 1=starboard tack)
- *   Field 4  = WIND DIRECTION (same for all boats, scaled heading, e.g., 179.0°)
+ *   Field 4  = WIND DIRECTION per boat (spatial variation — each boat sees different wind based on position)
  *   Field 5  = always [0] (unused)
  *   Field 6  = [16] — possibly wind speed (16kn?) or race config
  *   Field 7  = always [0] (unused)
@@ -28,7 +28,8 @@
  * Mark positions are NOT directly transmitted in the protocol. Detection relies
  * on analyzing boat convergence + turn-rate patterns (see mark-detector.js).
  *
- * Player boat = index 0 (confirmed: only boat with field 15/16 non-zero + active heading changes)
+ * Player boat = detected dynamically via PlayerDetector (helm input correlation).
+ * Cannot assume index 0 — player slot changes each race.
  */
 
 /** Placeholder scale factor — will be calibrated once coordinate system is understood. */
@@ -71,11 +72,18 @@ export const SPEED_SCALE = 10000;
 
 /**
  * Extract wind direction from decoded state (field 4).
- * All boats share the same value = true wind direction for the race area.
+ * Wind varies spatially — each boat has its own value.
+ * Returns the player's wind direction if playerSlot is known, else boat[0].
+ * @param {object} decodedState
+ * @param {number|null} [playerSlot]
  */
-export function extractWindDirection(decodedState) {
-  if (!decodedState?.boats?.[0]) return null;
-  // Field 4 is decoded as targetHeading — same for all boats = wind direction
+export function extractWindDirection(decodedState, playerSlot) {
+  if (!decodedState?.boats?.length) return null;
+  if (playerSlot != null) {
+    const playerBoat = decodedState.boats.find(b => b.slot === playerSlot);
+    if (playerBoat) return playerBoat.targetHeading ?? null;
+  }
+  // Fallback: first boat
   return decodedState.boats[0].targetHeading ?? null;
 }
 
@@ -91,15 +99,18 @@ export function extractWindSpeed(decodedState) {
 
 /**
  * @param {object} decodedState - Output of decodeState()
+ * @param {number|null} [playerSlot=null] - Detected player slot from PlayerDetector
  * @returns {object} Normalized Inshore state
  */
-export function normalizeInshoreState(decodedState) {
+export function normalizeInshoreState(decodedState, playerSlot) {
   if (!decodedState || !decodedState.boats) {
     return { tick: 0, boats: [], windDirection: null, windSpeed: null, timestamp: Date.now() };
   }
 
-  const windDirection = decodedState.boats?.[0]?.targetHeading ?? null;
   const windSpeed = decodedState.raw?.[6]?.[0] ?? null;
+
+  // "Global" wind direction = the player's local wind (or boat[0] fallback)
+  let globalWindDirection = null;
 
   const boats = [];
   for (let i = 0; i < decodedState.boats.length; i++) {
@@ -108,20 +119,27 @@ export function normalizeInshoreState(decodedState) {
     const speedNormalized = Math.min(rawSpeed / SPEED_SCALE, 1.5);
     const speedKnots = rawSpeed > 0 ? +(rawSpeed / SPEED_TO_KNOTS).toFixed(1) : 0;
     const heading = b.heading ?? 0;
+    const localWindDirection = b.targetHeading ?? null;
+    const isPlayer = playerSlot != null ? (b.slot ?? 0) === playerSlot : false;
 
-    // TWA and derived sailing metrics
+    // Track the player's wind as the "global" wind direction
+    if (isPlayer && localWindDirection != null) {
+      globalWindDirection = localWindDirection;
+    }
+
+    // TWA and derived sailing metrics — use THIS boat's local wind
     let twa = null;
     let tack = null;
     let pointOfSail = null;
     let vmg = null;
 
-    if (windDirection != null) {
-      twa = computeTWA(heading, windDirection);
+    if (localWindDirection != null) {
+      twa = computeTWA(heading, localWindDirection);
       tack = twa >= 0 ? 'starboard' : 'port';
       pointOfSail = classifyPointOfSail(Math.abs(twa));
 
-      // VMG for player boat (index 0) — in knots
-      if (i === 0) {
+      // VMG for player boat — in knots
+      if (isPlayer) {
         const twaRad = (twa * Math.PI) / 180;
         vmg = speedKnots * Math.cos(twaRad);
       }
@@ -133,9 +151,9 @@ export function normalizeInshoreState(decodedState) {
       x: (b.posX ?? 0) * COORDINATE_SCALE,
       y: (b.posY ?? 0) * COORDINATE_SCALE,
       rateOfTurn: b.turnRate ?? 0,
-      targetHeading: b.targetHeading ?? 0,
+      localWindDirection: localWindDirection ?? 0,
       active: b.penaltyTimer !== 65535,
-      isPlayer: i === 0,
+      isPlayer,
       speedRaw: rawSpeed,
       speed: speedNormalized,
       speedKnots,
@@ -150,6 +168,11 @@ export function normalizeInshoreState(decodedState) {
     });
   }
 
+  // If player not yet detected, fall back to boat[0]'s wind
+  if (globalWindDirection == null && decodedState.boats.length > 0) {
+    globalWindDirection = decodedState.boats[0].targetHeading ?? null;
+  }
+
   // Extract protocol fields useful for mark detection context
   const raceEventCode = decodedState.raw?.[2]?.[0] ?? 0;
   const tackFlags = Array.isArray(decodedState.raw?.[3]) ? [...decodedState.raw[3]] : [];
@@ -161,11 +184,11 @@ export function normalizeInshoreState(decodedState) {
   return {
     tick: decodedState.tick ?? 0,
     boats,
-    windDirection,
+    windDirection: globalWindDirection,
     windSpeed,
     raceEventCode,
     tackFlags,
-    playerBoatIndex: 0,
+    playerSlot: playerSlot ?? null,
     currentLap: decodedState.currentLap ?? null,
     raceTimer: raceTimerRaw,
     raceTimerSeconds,

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "vRegatta",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Virtual Regatta sailing tools — data capture & analytics",
   "permissions": ["storage", "scripting", "activeTab", "tabs"],
   "background": {

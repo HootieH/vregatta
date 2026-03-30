@@ -105,7 +105,7 @@ describe('normalizeInshoreState TWA fields', () => {
   }
 
   it('adds twa, tack, pointOfSail, vmg to player boat', () => {
-    const result = normalizeInshoreState(makeDecode(90, 0, 10000));
+    const result = normalizeInshoreState(makeDecode(90, 0, 10000), 1);
     const boat = result.boats[0];
 
     expect(boat.twa).toBe(90);
@@ -115,7 +115,7 @@ describe('normalizeInshoreState TWA fields', () => {
   });
 
   it('port tack detected correctly', () => {
-    const result = normalizeInshoreState(makeDecode(270, 0, 10000));
+    const result = normalizeInshoreState(makeDecode(270, 0, 10000), 1);
     const boat = result.boats[0];
 
     expect(boat.twa).toBe(-90);
@@ -123,7 +123,7 @@ describe('normalizeInshoreState TWA fields', () => {
   });
 
   it('VMG is positive for upwind', () => {
-    const result = normalizeInshoreState(makeDecode(45, 0, 10000));
+    const result = normalizeInshoreState(makeDecode(45, 0, 10000), 1);
     const boat = result.boats[0];
 
     // speedKnots = 10000/923 ≈ 10.83, twa=45, vmg = cos(45)*10.83 ≈ 7.66
@@ -133,7 +133,7 @@ describe('normalizeInshoreState TWA fields', () => {
   });
 
   it('VMG is negative for downwind', () => {
-    const result = normalizeInshoreState(makeDecode(150, 0, 10000));
+    const result = normalizeInshoreState(makeDecode(150, 0, 10000), 1);
     const boat = result.boats[0];
 
     expect(boat.vmg).toBeLessThan(0);
@@ -148,10 +148,10 @@ describe('normalizeInshoreState TWA fields', () => {
       ],
       raw: {},
     };
-    const result = normalizeInshoreState(decoded);
+    const result = normalizeInshoreState(decoded, 1);
 
-    expect(result.boats[0].vmg).not.toBeNull(); // player
-    expect(result.boats[1].vmg).toBeNull(); // non-player
+    expect(result.boats[0].vmg).not.toBeNull(); // player (slot 1)
+    expect(result.boats[1].vmg).toBeNull(); // non-player (slot 2)
   });
 
   it('TWA fields are null when windDirection is null', () => {
@@ -188,7 +188,7 @@ describe('LiveState inshore tack/gybe event detection', () => {
         x: 100,
         y: 200,
         rateOfTurn: 0,
-        targetHeading: windDir ?? 0,
+        localWindDirection: windDir ?? 0,
         active: true,
         isPlayer: true,
         speedRaw: 5000,
@@ -267,7 +267,7 @@ describe('LiveState getSnapshot inshore fields', () => {
         x: 100,
         y: 200,
         rateOfTurn: 0,
-        targetHeading: 0,
+        localWindDirection: 0,
         active: true,
         isPlayer: true,
         speedRaw: 8000,

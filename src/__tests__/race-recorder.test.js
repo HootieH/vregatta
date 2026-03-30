@@ -61,7 +61,7 @@ describe('RaceRecorder', () => {
         twa: 45,
         tack: 'starboard',
         rateOfTurn: 500,
-        targetHeading: 180,
+        localWindDirection: 180,
         active: true,
         isPlayer: true,
         speedRaw: 8000,
@@ -75,7 +75,7 @@ describe('RaceRecorder', () => {
       windSpeed: 16,
       raceEventCode: 0,
       tackFlags: [0, 0],
-      playerBoatIndex: 0,
+      playerSlot: 0,
       timestamp: Date.now(),
     };
 

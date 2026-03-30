@@ -88,7 +88,7 @@ export function initReplayPlayer(containerId) {
       isPlayer: i === 0,
       speedRaw: (b.speed ?? 0) * 10000,
       rateOfTurn: 0,
-      targetHeading: 0,
+      localWindDirection: 0,
       active: true,
       penaltyTimer: 65535,
       raceProgress: 0,

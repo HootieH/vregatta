@@ -19,7 +19,7 @@ function makeState(boats, tick, timestamp) {
       active: b.active ?? true,
       isPlayer: b.isPlayer ?? false,
       rateOfTurn: 0,
-      targetHeading: 0,
+      localWindDirection: 0,
       penaltyTimer: 65535,
       raceProgress: 0,
       distanceSailed: 0,

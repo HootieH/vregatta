@@ -28,6 +28,7 @@ import { decodeState } from './colyseus/state-decoder.js';
 import { normalizeInshoreState } from './colyseus/inshore-pipeline.js';
 import { decodeMasterState, decodeMasterUpdate } from './colyseus/master-decoder.js';
 import { FleetManager } from './colyseus/fleet-manager.js';
+import { PlayerDetector } from './colyseus/player-detector.js';
 import { RaceRecorder } from './storage/race-recorder.js';
 import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } from './telemetry.js';
 
@@ -42,6 +43,7 @@ const stateLog = createLogger('state');
 let db = null;
 const state = new LiveState();
 const fleetManager = new FleetManager();
+const playerDetector = new PlayerDetector();
 const masterLog = createLogger('master-decoder');
 
 // Auto-record every Inshore race in background
@@ -547,6 +549,8 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
         const currentHdg = playerBoat?.heading;
         const delta = currentHdg != null ? (decoded.heading - currentHdg).toFixed(1) : '?';
         wsLog.info(`Helm: ${decoded.heading.toFixed(1)}\u00b0 (delta=${delta}\u00b0, input #${stats.inshoreHelmInputs})`, { direction });
+        // Feed PlayerDetector
+        playerDetector.addHelmInput(decoded.heading, state.inshoreTick || Date.now());
         // Record helm input
         if (raceRecorder.isRecording()) {
           raceRecorder.addHelmInput(decoded.heading, timestamp || Date.now());
@@ -596,7 +600,8 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const payload = raw.slice(2); // strip 0xf3 + type byte
           const decompressed = await decompressStateAsync(payload);
           const decoded_state = decodeState(decompressed);
-          const normalized = normalizeInshoreState(decoded_state);
+          const normalized = normalizeInshoreState(decoded_state, playerDetector.getPlayerSlot());
+          playerDetector.updateFromState(normalized);
           const updateResult = state.updateInshore(normalized);
           fleetManager.updateFromGame(normalized);
 
@@ -638,8 +643,8 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           }
 
           // Log at DEBUG (not INFO) — 125/sec is too noisy for INFO
-          const myBoat = normalized.boats[0];
-          wsLog.debug(`State: ${normalized.boats.length} boats, tick=${normalized.tick}, hdg=${myBoat?.heading?.toFixed(0) ?? '?'}°, spd=${myBoat?.speedRaw ?? '?'}`);
+          const myBoat = normalized.boats.find(b => b.isPlayer) ?? normalized.boats[0];
+          wsLog.debug(`State: ${normalized.boats.length} boats, tick=${normalized.tick}, hdg=${myBoat?.heading?.toFixed(0) ?? '?'}°, spd=${myBoat?.speedRaw ?? '?'}, player=${playerDetector.getPlayerSlot() ?? '?'}`);
 
           // Log summary at INFO every 500th decode
           if (stats.inshoreStateDecodes % 500 === 0) {
@@ -665,6 +670,8 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
 
     case 'ws-leave':
       wsLog.info('WS leave room', { direction });
+      // Reset player detection for next race
+      playerDetector.reset();
       // Auto-stop recording on leave
       if (raceRecorder.isRecording()) {
         raceRecorder.addEvent({ type: 'leave', timestamp: Date.now(), direction });

@@ -33,7 +33,7 @@ describe('normalizeInshoreState', () => {
     expect(boat.x).toBe(15000 * COORDINATE_SCALE);
     expect(boat.y).toBe(22000 * COORDINATE_SCALE);
     expect(boat.rateOfTurn).toBe(-3);
-    expect(boat.targetHeading).toBe(179.0);
+    expect(boat.localWindDirection).toBe(179.0);
     expect(boat.active).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe('normalizeInshoreState', () => {
     expect(result.boats[0].x).toBe(0);
     expect(result.boats[0].y).toBe(0);
     expect(result.boats[0].rateOfTurn).toBe(0);
-    expect(result.boats[0].targetHeading).toBe(0);
+    expect(result.boats[0].localWindDirection).toBe(0);
     // field10 is undefined, not 65535, so active defaults correctly
     expect(result.boats[0].active).toBe(true);
 

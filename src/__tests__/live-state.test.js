@@ -172,8 +172,8 @@ describe('LiveState', () => {
       return {
         tick: 5000,
         boats: [
-          { slot: 6, heading: 180, x: 20000, y: 15000, rateOfTurn: 0, targetHeading: 180, active: true },
-          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, targetHeading: 91, active: true },
+          { slot: 6, heading: 180, x: 20000, y: 15000, rateOfTurn: 0, localWindDirection: 180, active: true },
+          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, localWindDirection: 91, active: true },
         ],
         timestamp: Date.now(),
         ...overrides,
@@ -197,8 +197,8 @@ describe('LiveState', () => {
       state.updateInshore(makeInshore());
       const result = state.updateInshore(makeInshore({
         boats: [
-          { slot: 6, heading: 181, x: 20001, y: 15000, rateOfTurn: 0, targetHeading: 180, active: true },
-          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, targetHeading: 91, active: true },
+          { slot: 6, heading: 181, x: 20001, y: 15000, rateOfTurn: 0, localWindDirection: 180, active: true },
+          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, localWindDirection: 91, active: true },
         ],
       }));
       expect(result.changed).toBe(true);
