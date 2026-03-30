@@ -107,24 +107,24 @@ export function initInshoreInstruments(containerId) {
       hdg.sub.textContent = '';
     }
 
-    // SPD — show as % of max observed, with raw in subtitle
+    // SPD — show in knots (calibrated: rawSpeed / 923 ≈ knots)
     const spd = cells.spd;
-    if (player.speedRaw != null && player.speedRaw > 0) {
+    if (player.speedKnots != null && player.speedKnots > 0) {
       if (player.speedRaw > maxObservedSpeed) {
         maxObservedSpeed = player.speedRaw;
       }
-      const pct = maxObservedSpeed > 0 ? Math.round((player.speedRaw / maxObservedSpeed) * 100) : 0;
-      spd.value.textContent = `${pct}%`;
-      spd.sub.textContent = `raw ${player.speedRaw}`;
+      spd.value.textContent = player.speedKnots.toFixed(1);
+      spd.sub.textContent = 'kn';
 
-      // Color based on percentage
+      // Color based on percentage of max observed
+      const pct = maxObservedSpeed > 0 ? Math.round((player.speedRaw / maxObservedSpeed) * 100) : 0;
       spd.value.className = 'instr-value';
       if (pct >= 80) spd.value.classList.add('spd-green');
       else if (pct >= 50) spd.value.classList.add('spd-yellow');
       else spd.value.classList.add('spd-red');
     } else {
       spd.value.textContent = '---';
-      spd.sub.textContent = '';
+      spd.sub.textContent = 'kn';
       spd.value.className = 'instr-value';
     }
 

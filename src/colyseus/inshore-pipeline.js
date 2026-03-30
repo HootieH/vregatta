@@ -63,7 +63,10 @@ export function classifyPointOfSail(absTwa) {
   return 'dead-downwind';
 }
 
-/** Speed scale: raw value ~10000 = full speed */
+/** Speed scale: rawSpeed / SPEED_TO_KNOTS ≈ boat speed in knots */
+export const SPEED_TO_KNOTS = 923;
+
+/** Legacy speed scale for normalized 0-1 range */
 export const SPEED_SCALE = 10000;
 
 /**
@@ -103,6 +106,7 @@ export function normalizeInshoreState(decodedState) {
     const b = decodedState.boats[i];
     const rawSpeed = b.speed ?? 0;
     const speedNormalized = Math.min(rawSpeed / SPEED_SCALE, 1.5);
+    const speedKnots = rawSpeed > 0 ? +(rawSpeed / SPEED_TO_KNOTS).toFixed(1) : 0;
     const heading = b.heading ?? 0;
 
     // TWA and derived sailing metrics
@@ -116,10 +120,10 @@ export function normalizeInshoreState(decodedState) {
       tack = twa >= 0 ? 'starboard' : 'port';
       pointOfSail = classifyPointOfSail(Math.abs(twa));
 
-      // VMG for player boat (index 0)
+      // VMG for player boat (index 0) — in knots
       if (i === 0) {
         const twaRad = (twa * Math.PI) / 180;
-        vmg = speedNormalized * Math.cos(twaRad);
+        vmg = speedKnots * Math.cos(twaRad);
       }
     }
 
@@ -134,6 +138,8 @@ export function normalizeInshoreState(decodedState) {
       isPlayer: i === 0,
       speedRaw: rawSpeed,
       speed: speedNormalized,
+      speedKnots,
+      turningDirection: b.turnRate > 50 ? 'starboard' : b.turnRate < -50 ? 'port' : 'straight',
       penaltyTimer: b.penaltyTimer ?? 65535,
       raceProgress: b.raceProgress ?? 0,
       distanceSailed: b.distanceSailed ?? 0,

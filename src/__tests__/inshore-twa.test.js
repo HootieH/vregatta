@@ -126,8 +126,9 @@ describe('normalizeInshoreState TWA fields', () => {
     const result = normalizeInshoreState(makeDecode(45, 0, 10000));
     const boat = result.boats[0];
 
-    // speed = 10000/10000 = 1.0, twa=45, vmg = cos(45)*1.0 ≈ 0.707
-    expect(boat.vmg).toBeCloseTo(Math.cos(45 * Math.PI / 180), 5);
+    // speedKnots = 10000/923 ≈ 10.83, twa=45, vmg = cos(45)*10.83 ≈ 7.66
+    const expectedKnots = 10000 / 923;
+    expect(boat.vmg).toBeCloseTo(expectedKnots * Math.cos(45 * Math.PI / 180), 0);
     expect(boat.vmg).toBeGreaterThan(0);
   });
 
