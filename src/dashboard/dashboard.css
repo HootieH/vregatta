@@ -931,6 +931,108 @@ body.mfd-active #panels {
   font-size: 13px;
 }
 
+/* Track controls toolbar */
+#track-controls {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 1000;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(13, 13, 36, 0.9);
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  padding: 4px 8px;
+  pointer-events: auto;
+}
+
+.track-control-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.track-control-label {
+  font-size: 10px;
+  color: #8888aa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-right: 2px;
+}
+
+.track-mode-select {
+  background: #1a1a3a;
+  border: 1px solid #2a2a4a;
+  color: #ccc;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.track-mode-select:hover {
+  border-color: #3a86ff;
+}
+
+.track-toggle-btn {
+  background: #1a1a3a;
+  border: 1px solid #2a2a4a;
+  color: #666;
+  font-family: monospace;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.track-toggle-btn:hover {
+  background: #2a2a5a;
+  color: #ccc;
+}
+
+.track-toggle-btn.active {
+  background: #3a86ff;
+  color: #fff;
+  border-color: #3a86ff;
+}
+
+/* Track event markers */
+.track-event-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.track-event-tooltip {
+  background: rgba(10, 10, 26, 0.92) !important;
+  border: 1px solid #3a86ff !important;
+  color: #e0e0e0 !important;
+  font-family: monospace !important;
+  font-size: 11px !important;
+  padding: 6px 10px !important;
+  border-radius: 4px !important;
+  line-height: 1.5 !important;
+}
+
+/* Heading projection labels */
+.projection-time-label {
+  font-family: monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* Wind field barbs */
+.wind-field-barb {
+  background: none !important;
+  border: none !important;
+}
+
 @media (max-width: 800px) {
   #panels {
     grid-template-columns: 1fr;

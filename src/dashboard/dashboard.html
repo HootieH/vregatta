@@ -34,6 +34,22 @@
       <div id="mfd-container"></div>
     </div>
   </div>
+  <div id="track-controls">
+    <div class="track-control-group">
+      <label class="track-control-label">Track</label>
+      <select id="track-mode-select" class="track-mode-select">
+        <option value="plain">Plain</option>
+        <option value="speed">Speed</option>
+        <option value="vmg">VMG</option>
+      </select>
+    </div>
+    <div class="track-control-group">
+      <button id="track-events-toggle" class="track-toggle-btn active" title="Show track events">Events</button>
+      <button id="track-projection-toggle" class="track-toggle-btn active" title="Show heading projection">Proj</button>
+      <button id="track-ghost-toggle" class="track-toggle-btn" title="Show ghost optimal track">Ghost</button>
+      <button id="track-wind-toggle" class="track-toggle-btn" title="Show wind field on track">Wind</button>
+    </div>
+  </div>
   <div id="route-panel"></div>
   <div id="rules-panel"></div>
   <div id="hud"></div>

@@ -23,6 +23,11 @@ import { bestVMG } from '../polars/best-vmg.js';
 import { computeSpeedEfficiency } from '../analytics/performance.js';
 import { detectEncounters } from '../rules/encounter-detector.js';
 import { initRulesPanel } from './rules-panel.js';
+import { initTrackRenderer } from './track-renderer.js';
+import { initTrackMarkers } from './track-markers.js';
+import { initHeadingProjection } from './heading-projection.js';
+import { initGhostTrack } from './ghost-track.js';
+import { initWindFieldTrack } from './wind-field-track.js';
 
 const map = init2DMap('map-2d');
 const globe = init3DGlobe('globe-3d');
@@ -50,6 +55,65 @@ const routePanel = initRoutePanel('route-panel');
 
 // Racing Rules panel
 const rulesPanel = initRulesPanel('rules-panel');
+
+// Track enhancement modules
+const trackRenderer = initTrackRenderer(map);
+const trackMarkers = initTrackMarkers(map);
+const headingProjection = initHeadingProjection(map);
+const ghostTrack = initGhostTrack(map);
+const windFieldTrack = initWindFieldTrack(map);
+
+// Track controls wiring
+const trackModeSelect = document.getElementById('track-mode-select');
+const trackEventsToggle = document.getElementById('track-events-toggle');
+const trackProjectionToggle = document.getElementById('track-projection-toggle');
+const trackGhostToggle = document.getElementById('track-ghost-toggle');
+const trackWindToggle = document.getElementById('track-wind-toggle');
+
+// Move track controls into the map container so they float over it
+const trackControlsEl = document.getElementById('track-controls');
+const mapContainer = document.getElementById('map-2d');
+if (trackControlsEl && mapContainer) {
+  mapContainer.appendChild(trackControlsEl);
+}
+
+if (trackModeSelect && trackRenderer) {
+  trackModeSelect.addEventListener('change', () => {
+    trackRenderer.setMode(trackModeSelect.value);
+  });
+}
+
+if (trackEventsToggle && trackMarkers) {
+  trackEventsToggle.addEventListener('click', () => {
+    const active = trackEventsToggle.classList.toggle('active');
+    trackMarkers.setVisible(active);
+  });
+}
+
+if (trackProjectionToggle && headingProjection) {
+  trackProjectionToggle.addEventListener('click', () => {
+    const active = trackProjectionToggle.classList.toggle('active');
+    headingProjection.setVisible(active);
+  });
+}
+
+if (trackGhostToggle && ghostTrack) {
+  trackGhostToggle.addEventListener('click', () => {
+    const active = trackGhostToggle.classList.toggle('active');
+    ghostTrack.setVisible(active);
+  });
+}
+
+if (trackWindToggle && windFieldTrack) {
+  trackWindToggle.addEventListener('click', () => {
+    const active = trackWindToggle.classList.toggle('active');
+    windFieldTrack.setVisible(active);
+  });
+}
+
+// Throttle for Inshore track updates (500ms)
+let lastInshoreTrackUpdate = 0;
+const INSHORE_TRACK_THROTTLE = 500;
 
 // Wind strip collapsible toggle
 const windStripToggle = document.getElementById('wind-strip-toggle');
@@ -346,6 +410,52 @@ const bridge = createDataBridge((snapshot, positionHistory) => {
     // Update route advice with latest data
     if (routingActive && routeOverlay?.getWaypoint()) {
       updateRouteAdvice();
+    }
+  }
+
+  // --- Track enhancement updates ---
+  const opts = snapshot?.race?.options || [];
+
+  // Track renderer (color-coded tracks)
+  if (trackRenderer && positionHistory) {
+    trackRenderer.update(positionHistory, snapshot?.boat, cachedPolar, opts);
+  }
+
+  // Track event markers
+  if (trackMarkers && snapshot?.events) {
+    trackMarkers.update(snapshot.events, positionHistory);
+  }
+
+  // Heading projection
+  if (headingProjection && snapshot?.boat) {
+    headingProjection.update(snapshot.boat, cachedPolar, opts);
+  }
+
+  // Ghost track (Offshore only)
+  if (ghostTrack && positionHistory && cachedPolar && snapshot?.boat) {
+    ghostTrack.update(positionHistory, cachedPolar, opts, {
+      tws: snapshot.boat.tws,
+      twd: snapshot.boat.twd,
+    });
+  }
+
+  // Wind field on track
+  if (windFieldTrack && positionHistory) {
+    windFieldTrack.update(positionHistory, null);
+  }
+
+  // Inshore track enhancements (throttled)
+  if (snapshot?.inshoreActive && snapshot._inshoreTrackHistory) {
+    const now = Date.now();
+    if (now - lastInshoreTrackUpdate >= INSHORE_TRACK_THROTTLE) {
+      lastInshoreTrackUpdate = now;
+      if (trackRenderer) {
+        trackRenderer.updateInshore(snapshot._inshoreTrackHistory, cachedPolar, opts);
+      }
+      // Heading projection for Inshore player boat
+      if (headingProjection && snapshot.inshorePlayerBoat) {
+        headingProjection.update(snapshot.inshorePlayerBoat, null, null);
+      }
     }
   }
 });
