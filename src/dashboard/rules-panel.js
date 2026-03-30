@@ -54,13 +54,16 @@ export function initRulesPanel(containerId) {
   let lastTipRule = null;
   /** @type {Map<number, string>} slot -> player name */
   let fleetNames = new Map();
+  /** Track what's currently rendered to avoid unnecessary DOM thrashing */
+  let renderedEncounterKey = '';
 
   function renderIdle() {
+    if (renderedEncounterKey === 'idle') return; // already showing idle
+    renderedEncounterKey = 'idle';
+
     const tip = getRandomRule();
-    // Avoid showing the same tip twice in a row
     if (lastTipRule === tip.number) {
-      const allRules = [tip]; // fallback
-      void allRules;
+      // Just keep the current tip
     }
     lastTipRule = tip.number;
 
@@ -84,6 +87,11 @@ export function initRulesPanel(containerId) {
       renderIdle();
       return;
     }
+
+    // Build a key to check if encounters actually changed
+    const key = encounters.map(e => `${e.rule}:${e.otherBoat?.slot ?? ''}:${e.urgency}:${e.playerRole}`).join('|');
+    if (key === renderedEncounterKey) return; // skip — nothing changed
+    renderedEncounterKey = key;
 
     let html = '';
     for (const enc of encounters) {

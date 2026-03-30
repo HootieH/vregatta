@@ -211,6 +211,11 @@ html, body {
   line-height: 1.5;
 }
 
+.rules-content {
+  transition: opacity 0.15s ease;
+  min-height: 100px;
+}
+
 .rules-encounter-card {
   background: #12122a;
   border: 1px solid #2a2a4a;

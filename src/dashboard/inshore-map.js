@@ -150,8 +150,15 @@ export function initInshoreMap(containerId) {
     return [-boat.y, boat.x];
   }
 
+  let lastMapRender = 0;
+  const MAP_RENDER_INTERVAL = 500; // render map at max 2fps — smooth enough, saves CPU
+
   function update(snapshot) {
     if (!snapshot || !snapshot.inshoreActive) return;
+
+    const now = Date.now();
+    if (!firstUpdate && now - lastMapRender < MAP_RENDER_INTERVAL) return;
+    lastMapRender = now;
 
     // Use accumulated fleet (all known boats) if available, fall back to visible-only
     const allBoats = snapshot.inshoreAllBoats && snapshot.inshoreAllBoats.length > 0
@@ -289,7 +296,7 @@ export function initInshoreMap(containerId) {
       const bounds = L.latLngBounds(boatsForZoom.map(b => toLatLng(b)));
 
       if (firstUpdate) {
-        map.fitBounds(bounds.pad(0.5), { maxZoom: -1 });
+        map.fitBounds(bounds.pad(0.3), { maxZoom: 0, animate: false });
         firstUpdate = false;
       } else if (boatsForZoom.length === 1) {
         // Follow single boat

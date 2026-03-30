@@ -53,6 +53,11 @@ let lastEventCount = 0;
 // Penalty tracking
 const penaltyState = new Map();
 
+// Throttle rules panel — max 1 update per second, only when encounters change
+let lastRulesUpdate = 0;
+let lastEncounterKey = '';
+const RULES_UPDATE_INTERVAL = 1000;
+
 function poll() {
   chrome.runtime.sendMessage({ type: 'getStatus' }, (response) => {
     if (chrome.runtime.lastError || !response) return;
@@ -168,10 +173,18 @@ function poll() {
         if (raceMap) raceMap.updateMarks(detectedMarks);
       }
 
-      // Feed fleet names and rules panel
+      // Feed fleet names and rules panel — THROTTLED to prevent layout thrashing
       if (rulesPanel) {
         if (snapshot.inshoreFleet) rulesPanel.updateFleet(snapshot.inshoreFleet);
-        rulesPanel.update(encounters);
+
+        // Only update rules if encounters changed OR enough time passed
+        const encounterKey = encounters.map(e => `${e.rule}:${e.otherBoat?.slot ?? 'mark'}:${e.urgency}`).join('|');
+        const rulesTimePassed = now - lastRulesUpdate >= RULES_UPDATE_INTERVAL;
+        if (encounterKey !== lastEncounterKey || rulesTimePassed) {
+          lastEncounterKey = encounterKey;
+          lastRulesUpdate = now;
+          rulesPanel.update(encounters);
+        }
       }
 
       // --- Events ---
