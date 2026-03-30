@@ -6,13 +6,62 @@
   <title>vRegatta Inshore</title>
   <link rel="stylesheet" href="leaflet.css">
   <link rel="stylesheet" href="inshore-dashboard.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Overpass:wght@300;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="inshore-app">
+    <!-- Primary instruments — top strip -->
+    <div id="top-strip">
+      <div class="top-instr" id="ti-hdg">
+        <span class="ti-label">HDG</span>
+        <span class="ti-value" data-field="hdg">---</span>
+        <span class="ti-unit" data-field="hdg-sub"></span>
+      </div>
+      <div class="top-instr primary" id="ti-spd">
+        <span class="ti-label">SPD</span>
+        <span class="ti-value" data-field="spd">---</span>
+        <span class="ti-unit" data-field="spd-sub">kn</span>
+      </div>
+      <div class="top-instr" id="ti-twa">
+        <span class="ti-label">TWA</span>
+        <span class="ti-value" data-field="twa">---</span>
+        <span class="ti-unit" data-field="twa-sub"></span>
+      </div>
+      <div class="top-instr" id="ti-twd">
+        <span class="ti-label">TWD</span>
+        <span class="ti-value" data-field="twd">---</span>
+        <span class="ti-unit" data-field="twd-sub"></span>
+      </div>
+      <div class="top-instr" id="ti-vmg">
+        <span class="ti-label">VMG</span>
+        <span class="ti-value" data-field="vmg">---</span>
+        <span class="ti-unit" data-field="vmg-sub"></span>
+      </div>
+      <div class="top-instr" id="ti-pos">
+        <span class="ti-label">SAIL</span>
+        <span class="ti-value ti-text" data-field="pos">---</span>
+      </div>
+      <div class="top-instr race-info" id="ti-lap">
+        <span class="ti-label">LAP</span>
+        <span class="ti-value" data-field="lap">---</span>
+      </div>
+      <div class="top-instr race-info" id="ti-timer">
+        <span class="ti-label">TIMER</span>
+        <span class="ti-value" data-field="timer">---</span>
+      </div>
+    </div>
+
+    <!-- Map fills center -->
     <div id="race-map"></div>
+
+    <!-- Rules sidebar — right edge -->
     <div id="rules-sidebar"></div>
-    <div id="instrument-bar"></div>
-    <div id="events-panel"></div>
+
+    <!-- Fleet counter overlay on map -->
+    <div id="fleet-overlay"></div>
+
     <!-- Capture controls -->
     <div id="capture-controls">
       <button id="capture-btn" title="Click: capture screenshot + state&#10;Shift+click: start sequence capture">
@@ -24,13 +73,23 @@
         <button id="capture-stop-btn" title="Stop recording">Stop</button>
       </div>
     </div>
+
     <!-- Shutter flash overlay -->
     <div id="shutter-flash"></div>
+
+    <!-- Waiting state -->
     <div id="waiting-overlay">
       <div class="waiting-content">
-        <div class="waiting-icon">&#9973;</div>
-        <div class="waiting-title">Waiting for Inshore race...</div>
-        <div class="waiting-hint">Open Virtual Regatta Inshore and join a race.<br>Data will appear automatically.</div>
+        <div class="waiting-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <path d="M32 8 Q48 20 44 36 L32 44 Z" fill="#1e90ff" opacity="0.9"/>
+            <path d="M32 12 Q20 24 22 36 L32 42 Z" fill="#00b4d8" opacity="0.7"/>
+            <line x1="32" y1="8" x2="32" y2="48" stroke="#4a6fa5" stroke-width="1.5"/>
+            <path d="M12 50 Q22 44 32 50 Q42 56 52 50" fill="none" stroke="#1e3a5f" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="waiting-title">vRegatta</div>
+        <div class="waiting-hint">Waiting for Inshore race data&hellip;</div>
       </div>
     </div>
   </div>

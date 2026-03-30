@@ -1,155 +1,109 @@
 /**
- * Compact instrument bar for the Inshore dashboard.
+ * Inshore instrument strip — top bar of the racing cockpit.
  *
- * Shows heading, speed, TWA, wind direction, point of sail, and VMG
- * as large glanceable numbers in a single row.
+ * Reads data-field attributes from the HTML to find value/sub elements.
+ * No DOM creation — the layout is defined in inshore-dashboard.html.
  */
 
 const POS_NAMES = {
-  'head-to-wind': 'Head to Wind',
+  'head-to-wind': 'In Irons',
   'close-hauled': 'Close Hauled',
   'close-reach': 'Close Reach',
   'beam-reach': 'Beam Reach',
   'broad-reach': 'Broad Reach',
   'running': 'Running',
-  'dead-downwind': 'Dead Downwind',
+  'dead-downwind': 'Dead Run',
 };
 
-const COMPASS_POINTS = [
-  { min: 337.5, max: 360, label: 'N' },
-  { min: 0, max: 22.5, label: 'N' },
-  { min: 22.5, max: 67.5, label: 'NE' },
-  { min: 67.5, max: 112.5, label: 'E' },
-  { min: 112.5, max: 157.5, label: 'SE' },
-  { min: 157.5, max: 202.5, label: 'S' },
-  { min: 202.5, max: 247.5, label: 'SW' },
-  { min: 247.5, max: 292.5, label: 'W' },
-  { min: 292.5, max: 337.5, label: 'NW' },
+const COMPASS = [
+  [337.5, 360, 'N'], [0, 22.5, 'N'], [22.5, 67.5, 'NE'],
+  [67.5, 112.5, 'E'], [112.5, 157.5, 'SE'], [157.5, 202.5, 'S'],
+  [202.5, 247.5, 'SW'], [247.5, 292.5, 'W'], [292.5, 337.5, 'NW'],
 ];
 
 function compassLabel(deg) {
   if (deg == null) return '';
   const d = ((deg % 360) + 360) % 360;
-  for (const p of COMPASS_POINTS) {
-    if (p.min <= d && d < p.max) return p.label;
+  for (const [min, max, label] of COMPASS) {
+    if (d >= min && d < max) return label;
   }
   return 'N';
 }
 
+function $(sel) { return document.querySelector(sel); }
+
+function setField(field, text, colorClass) {
+  const el = $(`[data-field="${field}"]`);
+  if (!el) return;
+  el.textContent = text;
+  // Reset color classes
+  el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+  if (colorClass) el.classList.add(colorClass);
+}
+
 /**
- * Initialize instruments in the given container.
- *
- * @param {string} containerId
+ * @param {string} _containerId — ignored, reads from top-strip HTML
  * @returns {{ update: function }}
  */
-export function initInshoreInstruments(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return null;
-
-  // Track max observed speed for % calculation
-  let maxObservedSpeed = 0;
-
-  // Build instrument cells
-  const cells = {};
-
-  function makeCell(id, label) {
-    const cell = document.createElement('div');
-    cell.className = 'instr-cell';
-
-    const lbl = document.createElement('div');
-    lbl.className = 'instr-label';
-    lbl.textContent = label;
-    cell.appendChild(lbl);
-
-    const val = document.createElement('div');
-    val.className = 'instr-value';
-    val.textContent = '---';
-    cell.appendChild(val);
-
-    const sub = document.createElement('div');
-    sub.className = 'instr-sub';
-    cell.appendChild(sub);
-
-    container.appendChild(cell);
-    cells[id] = { cell, value: val, sub };
-    return cells[id];
-  }
-
-  makeCell('hdg', 'HDG');
-  makeCell('spd', 'SPD');
-  makeCell('twa', 'TWA');
-  makeCell('twd', 'TWD');
-  makeCell('pos', 'SAIL');
-  makeCell('vmg', 'VMG');
-  makeCell('lap', 'LAP');
-  makeCell('timer', 'TIMER');
+export function initInshoreInstruments() {
+  let maxSpeed = 0;
 
   function update(snapshot) {
     if (!snapshot) return;
+    const p = snapshot.inshorePlayerBoat;
 
-    const player = snapshot.inshorePlayerBoat;
-    if (!player) {
-      for (const c of Object.values(cells)) {
-        c.value.textContent = '---';
-        c.sub.textContent = '';
-        c.value.className = 'instr-value';
+    if (!p) {
+      for (const field of ['hdg', 'spd', 'twa', 'twd', 'vmg', 'pos', 'lap', 'timer']) {
+        setField(field, '---');
+        setField(field + '-sub', '');
       }
       return;
     }
 
     // HDG
-    const hdg = cells.hdg;
-    if (player.heading != null) {
-      hdg.value.textContent = `${String(Math.round(player.heading)).padStart(3, '0')}`;
-      hdg.sub.textContent = compassLabel(player.heading);
+    if (p.heading != null) {
+      setField('hdg', String(Math.round(p.heading)).padStart(3, '0'));
+      setField('hdg-sub', compassLabel(p.heading));
     } else {
-      hdg.value.textContent = '---';
-      hdg.sub.textContent = '';
+      setField('hdg', '---');
     }
 
-    // SPD — show in knots (calibrated: rawSpeed / 923 ≈ knots)
-    const spd = cells.spd;
-    if (player.speedKnots != null && player.speedKnots > 0) {
-      if (player.speedRaw > maxObservedSpeed) {
-        maxObservedSpeed = player.speedRaw;
+    // SPD
+    if (p.speedKnots != null && p.speedKnots > 0) {
+      if (p.speedRaw > maxSpeed) maxSpeed = p.speedRaw;
+      setField('spd', p.speedKnots.toFixed(1));
+      setField('spd-sub', 'kn');
+      const pct = maxSpeed > 0 ? (p.speedRaw / maxSpeed) * 100 : 0;
+      const el = $('[data-field="spd"]');
+      if (el) {
+        el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+        el.classList.add('ti-value');
+        el.classList.add(pct >= 80 ? 'clr-green' : pct >= 50 ? 'clr-amber' : 'clr-red');
       }
-      spd.value.textContent = player.speedKnots.toFixed(1);
-      spd.sub.textContent = 'kn';
-
-      // Color based on percentage of max observed
-      const pct = maxObservedSpeed > 0 ? Math.round((player.speedRaw / maxObservedSpeed) * 100) : 0;
-      spd.value.className = 'instr-value';
-      if (pct >= 80) spd.value.classList.add('spd-green');
-      else if (pct >= 50) spd.value.classList.add('spd-yellow');
-      else spd.value.classList.add('spd-red');
     } else {
-      spd.value.textContent = '---';
-      spd.sub.textContent = 'kn';
-      spd.value.className = 'instr-value';
+      setField('spd', '---');
     }
 
     // TWA
-    const twa = cells.twa;
-    if (player.twa != null) {
-      const absTwa = Math.abs(Math.round(player.twa));
-      const side = player.twa >= 0 ? 'STBD' : 'PORT';
-      twa.value.textContent = `${absTwa}`;
-      twa.sub.textContent = side;
-      twa.value.className = 'instr-value';
-      twa.value.classList.add(player.twa >= 0 ? 'twa-stbd' : 'twa-port');
+    if (p.twa != null) {
+      setField('twa', String(Math.abs(Math.round(p.twa))));
+      setField('twa-sub', p.twa >= 0 ? 'STBD' : 'PORT');
+      const el = $('[data-field="twa"]');
+      if (el) {
+        el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+        el.classList.add('ti-value');
+        el.classList.add(p.twa >= 0 ? 'clr-stbd' : 'clr-port');
+      }
     } else {
-      twa.value.textContent = '---';
-      twa.sub.textContent = '';
-      twa.value.className = 'instr-value';
+      setField('twa', '---');
+      setField('twa-sub', '');
     }
 
-    // TWD — with wind shift trend indicator
-    const twd = cells.twd;
+    // TWD
     if (snapshot.inshoreWindDirection != null) {
       const wd = Math.round(snapshot.inshoreWindDirection);
-      twd.value.textContent = `${String(wd).padStart(3, '0')}`;
+      setField('twd', String(wd).padStart(3, '0'));
 
-      // Show wind trend from history
       const wh = snapshot.inshoreWindHistory;
       if (wh && wh.length >= 10) {
         const recent = wh[wh.length - 1].direction;
@@ -158,73 +112,68 @@ export function initInshoreInstruments(containerId) {
         if (delta > 180) delta -= 360;
         if (delta < -180) delta += 360;
         if (Math.abs(delta) >= 2) {
-          const arrow = delta > 0 ? '\u2191' : '\u2193'; // ↑ veering, ↓ backing
-          twd.sub.textContent = `${compassLabel(wd)} ${arrow}${Math.abs(delta).toFixed(0)}\u00b0`;
-          twd.value.className = 'instr-value twd-shifting';
+          const arrow = delta > 0 ? '\u2191' : '\u2193';
+          setField('twd-sub', `${compassLabel(wd)} ${arrow}${Math.abs(delta).toFixed(0)}\u00b0`);
+          const el = $('[data-field="twd"]');
+          if (el) {
+            el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+            el.classList.add('ti-value', 'clr-amber');
+          }
         } else {
-          twd.sub.textContent = compassLabel(wd) + ' steady';
-          twd.value.className = 'instr-value';
+          setField('twd-sub', compassLabel(wd));
         }
       } else {
-        twd.sub.textContent = compassLabel(wd);
-        twd.value.className = 'instr-value';
+        setField('twd-sub', compassLabel(wd));
       }
     } else {
-      twd.value.textContent = '---';
-      twd.sub.textContent = '';
-      twd.value.className = 'instr-value';
-    }
-
-    // POS (Point of Sail)
-    const pos = cells.pos;
-    if (player.pointOfSail) {
-      pos.value.textContent = POS_NAMES[player.pointOfSail] || player.pointOfSail;
-      pos.value.style.fontSize = '18px'; // Smaller for text
-      pos.sub.textContent = '';
-    } else {
-      pos.value.textContent = '---';
-      pos.value.style.fontSize = '';
-      pos.sub.textContent = '';
+      setField('twd', '---');
+      setField('twd-sub', '');
     }
 
     // VMG
-    const vmg = cells.vmg;
-    if (player.vmg != null) {
-      const absVmg = Math.abs(player.vmg);
-      const dir = player.vmg >= 0 ? 'UP' : 'DN';
-      vmg.value.textContent = absVmg.toFixed(2);
-      vmg.sub.textContent = dir;
-      vmg.value.className = 'instr-value';
-      vmg.value.classList.add(player.vmg >= 0 ? 'vmg-up' : 'vmg-down');
+    if (p.vmg != null) {
+      setField('vmg', Math.abs(p.vmg).toFixed(1));
+      setField('vmg-sub', p.vmg >= 0 ? 'UP' : 'DN');
+      const el = $('[data-field="vmg"]');
+      if (el) {
+        el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+        el.classList.add('ti-value');
+        el.classList.add(p.vmg >= 0 ? 'clr-green' : 'clr-blue');
+      }
     } else {
-      vmg.value.textContent = '---';
-      vmg.sub.textContent = '';
-      vmg.value.className = 'instr-value';
+      setField('vmg', '---');
+      setField('vmg-sub', '');
+    }
+
+    // Point of Sail
+    if (p.pointOfSail) {
+      setField('pos', POS_NAMES[p.pointOfSail] || p.pointOfSail);
+    } else {
+      setField('pos', '---');
     }
 
     // LAP
-    const lap = cells.lap;
     if (snapshot.inshoreCurrentLap != null) {
-      lap.value.textContent = String(snapshot.inshoreCurrentLap);
-      lap.sub.textContent = '';
+      setField('lap', String(snapshot.inshoreCurrentLap));
     } else {
-      lap.value.textContent = '---';
-      lap.sub.textContent = '';
+      setField('lap', '---');
     }
 
-    // TIMER — race countdown
-    const timer = cells.timer;
-    if (snapshot.inshoreRaceTimerSeconds != null) {
-      const secs = snapshot.inshoreRaceTimerSeconds;
-      const min = Math.floor(secs / 60);
-      const sec = secs % 60;
-      timer.value.textContent = `${min}:${String(sec).padStart(2, '0')}`;
-      timer.value.className = 'instr-value';
-      if (secs < 30) timer.value.classList.add('timer-critical');
-      else if (secs < 60) timer.value.classList.add('timer-warning');
+    // TIMER
+    if (snapshot.inshoreRaceTimerSeconds != null && snapshot.inshoreRaceTimerSeconds > 0) {
+      const s = snapshot.inshoreRaceTimerSeconds;
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      setField('timer', `${m}:${String(sec).padStart(2, '0')}`);
+      const el = $('[data-field="timer"]');
+      if (el) {
+        el.className = el.className.replace(/\bclr-\S+/g, '').trim();
+        el.classList.add('ti-value');
+        if (s < 30) el.classList.add('clr-red');
+        else if (s < 60) el.classList.add('clr-amber');
+      }
     } else {
-      timer.value.textContent = '---';
-      timer.value.className = 'instr-value';
+      setField('timer', '---');
     }
   }
 

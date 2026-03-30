@@ -20,7 +20,7 @@ const events = initInshoreEvents('rules-sidebar');
 const capture = initCapture();
 
 // Fleet count display
-const fleetCountEl = document.getElementById('fleet-count');
+const fleetCountEl = document.getElementById('fleet-overlay');
 
 // New boat notification element
 let newBoatNotif = document.getElementById('new-boat-notif');
