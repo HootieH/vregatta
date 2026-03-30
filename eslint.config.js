@@ -30,6 +30,7 @@ export default [
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
         performance: 'readonly',
+        location: 'readonly',
         atob: 'readonly',
         btoa: 'readonly',
         Buffer: 'readonly',

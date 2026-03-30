@@ -6,7 +6,16 @@
     'vro-api-client.prod.virtualregatta.com',
     'vro-api-ranking.prod.virtualregatta.com',
     'static.virtualregatta.com/winds/live/',
+    // Inshore domains
+    'inshore.virtualregatta.com',
+    'virtualregatta.com/api',
+    'virtualregatta.com/config',
+    'virtualregatta.com/course',
+    'virtualregatta.com/game',
   ];
+
+  // Broad capture: catch ALL fetches from VR game pages for discovery
+  const VR_BROAD_CAPTURE = location.hostname.includes('virtualregatta.com');
 
   const SENSITIVE_FIELDS = ['password', 'userName', 'email'];
 
@@ -23,6 +32,8 @@
   }
 
   function isVrUrl(url) {
+    // On VR game pages, capture ALL fetches for course/config discovery
+    if (VR_BROAD_CAPTURE) return true;
     return VR_DOMAINS.some((domain) => url.includes(domain));
   }
 
