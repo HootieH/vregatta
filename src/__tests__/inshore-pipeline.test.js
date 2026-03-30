@@ -6,12 +6,12 @@ describe('normalizeInshoreState', () => {
     tick: 12345,
     boatCount: 6,
     boats: [
-      { slot: 6, heading: 257.34, targetHeading: 179.0, turnRate: -3, posX: 15000, posY: 22000, field10: 100, field14: 5 },
-      { slot: 2, heading: 90.5, targetHeading: 179.0, turnRate: 0, posX: 15200, posY: 22100, field10: 200, field14: 3 },
-      { slot: 3, heading: 45.0, targetHeading: 179.0, turnRate: 1, posX: 14800, posY: 21900, field10: 65535, field14: 0 },
-      { slot: 4, heading: 120.0, targetHeading: 179.0, turnRate: -1, posX: 15500, posY: 22300, field10: 50, field14: 7 },
-      { slot: 8, heading: 300.0, targetHeading: 179.0, turnRate: 2, posX: 14500, posY: 21500, field10: 0, field14: 1 },
-      { slot: 9, heading: 180.0, targetHeading: 179.0, turnRate: 0, posX: 15100, posY: 22050, field10: 65535, field14: 0 },
+      { slot: 6, heading: 257.34, targetHeading: 179.0, turnRate: -3, posX: 15000, posY: 22000, penaltyTimer: 100, speed: 5 },
+      { slot: 2, heading: 90.5, targetHeading: 179.0, turnRate: 0, posX: 15200, posY: 22100, penaltyTimer: 200, speed: 3 },
+      { slot: 3, heading: 45.0, targetHeading: 179.0, turnRate: 1, posX: 14800, posY: 21900, penaltyTimer: 65535, speed: 0 },
+      { slot: 4, heading: 120.0, targetHeading: 179.0, turnRate: -1, posX: 15500, posY: 22300, penaltyTimer: 50, speed: 7 },
+      { slot: 8, heading: 300.0, targetHeading: 179.0, turnRate: 2, posX: 14500, posY: 21500, penaltyTimer: 0, speed: 1 },
+      { slot: 9, heading: 180.0, targetHeading: 179.0, turnRate: 0, posX: 15100, posY: 22050, penaltyTimer: 65535, speed: 0 },
     ],
     raw: {},
   };
@@ -94,5 +94,34 @@ describe('normalizeInshoreState', () => {
 describe('COORDINATE_SCALE', () => {
   it('is exported and equals 1 (uncalibrated)', () => {
     expect(COORDINATE_SCALE).toBe(1);
+  });
+});
+
+describe('performance', () => {
+  it('normalizes 1000 states under 100ms (~125 msgs/sec budget)', () => {
+    const decoded = {
+      tick: 12345,
+      boatCount: 6,
+      boats: Array.from({ length: 6 }, (_, i) => ({
+        slot: i + 1,
+        heading: i * 60,
+        targetHeading: 179,
+        turnRate: 0,
+        posX: 15000 + i * 100,
+        posY: 22000 + i * 100,
+        penaltyTimer: i === 5 ? 65535 : 100,
+        speed: 0,
+      })),
+      raw: {},
+    };
+
+    const { performance: perf } = require('node:perf_hooks');
+    const start = perf.now();
+    for (let i = 0; i < 1000; i++) {
+      normalizeInshoreState(decoded);
+    }
+    const elapsed = perf.now() - start;
+
+    expect(elapsed).toBeLessThan(100);
   });
 });

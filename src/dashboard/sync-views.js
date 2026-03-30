@@ -10,6 +10,7 @@ export function syncViews(map2d, globe3d) {
     onBoatUpdate(snapshot, positionHistory) {
       if (map2d) map2d.update(snapshot, positionHistory);
       if (globe3d) globe3d.update(snapshot, positionHistory);
+      if (map2d && snapshot?.inshoreActive) map2d.updateInshore(snapshot);
     },
   };
 }

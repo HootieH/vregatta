@@ -166,4 +166,69 @@ describe('LiveState', () => {
       expect(snap.events).toHaveLength(5);
     });
   });
+
+  describe('updateInshore', () => {
+    function makeInshore(overrides = {}) {
+      return {
+        tick: 5000,
+        boats: [
+          { slot: 6, heading: 180, x: 20000, y: 15000, rateOfTurn: 0, targetHeading: 180, active: true },
+          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, targetHeading: 91, active: true },
+        ],
+        timestamp: Date.now(),
+        ...overrides,
+      };
+    }
+
+    it('stores boats in inshoreBoats map', () => {
+      state.updateInshore(makeInshore());
+
+      expect(state.inshoreBoats.size).toBe(2);
+      expect(state.inshoreBoats.get(6).heading).toBe(180);
+      expect(state.inshoreBoats.get(2).heading).toBe(90);
+    });
+
+    it('updates inshoreTick', () => {
+      state.updateInshore(makeInshore({ tick: 9999 }));
+      expect(state.inshoreTick).toBe(9999);
+    });
+
+    it('returns changed=true when position changes', () => {
+      state.updateInshore(makeInshore());
+      const result = state.updateInshore(makeInshore({
+        boats: [
+          { slot: 6, heading: 181, x: 20001, y: 15000, rateOfTurn: 0, targetHeading: 180, active: true },
+          { slot: 2, heading: 90, x: 20500, y: 15200, rateOfTurn: -1, targetHeading: 91, active: true },
+        ],
+      }));
+      expect(result.changed).toBe(true);
+    });
+
+    it('returns changed=false when nothing changes', () => {
+      const data = makeInshore();
+      state.updateInshore(data);
+      const result = state.updateInshore(data);
+      expect(result.changed).toBe(false);
+    });
+
+    it('returns changed=false for null input', () => {
+      const result = state.updateInshore(null);
+      expect(result.changed).toBe(false);
+    });
+
+    it('includes inshore data in snapshot', () => {
+      state.updateInshore(makeInshore());
+      const snap = state.getSnapshot();
+
+      expect(snap.inshoreActive).toBe(true);
+      expect(snap.inshoreBoats).toHaveLength(2);
+      expect(snap.inshoreTick).toBe(5000);
+    });
+
+    it('snapshot shows inshoreActive=false when no boats', () => {
+      const snap = state.getSnapshot();
+      expect(snap.inshoreActive).toBe(false);
+      expect(snap.inshoreBoats).toEqual([]);
+    });
+  });
 });

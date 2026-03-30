@@ -19,6 +19,10 @@ export function normalizeInshoreState(decodedState) {
 
   const boats = [];
   for (const b of decodedState.boats) {
+    // Speed is a raw uint16 (~10000 = full speed). Normalize to 0-1 range.
+    const rawSpeed = b.speed ?? 0;
+    const speedNormalized = Math.min(rawSpeed / 10000, 1.5);
+
     boats.push({
       slot: b.slot ?? 0,
       heading: b.heading ?? 0,
@@ -26,7 +30,12 @@ export function normalizeInshoreState(decodedState) {
       y: (b.posY ?? 0) * COORDINATE_SCALE,
       rateOfTurn: b.turnRate ?? 0,
       targetHeading: b.targetHeading ?? 0,
-      active: b.field10 !== 65535,
+      active: b.penaltyTimer !== 65535,
+      speedRaw: rawSpeed,
+      speed: speedNormalized,
+      penaltyTimer: b.penaltyTimer ?? 65535,
+      raceProgress: b.raceProgress ?? 0,
+      distanceSailed: b.distanceSailed ?? 0,
     });
   }
 

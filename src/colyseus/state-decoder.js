@@ -12,16 +12,22 @@
  *  Key 3  - Array[6] of int16: Unknown per-boat metric (often 0 or -1)
  *  Key 4  - Array[6] of int16: Target heading per boat (scaled uint16, * 360/65536)
  *                               Often identical across boats (e.g., all 179.0 = wind direction?)
- *  Key 10 - Array[6] of uint16: Unknown metric (65535 = idle/max, lower when active)
- *                               Possibly time-to-waypoint or penalty timer
+ *  Key 10 - Array[6] of uint16: MANEUVER PENALTY / turn penalty timer
+ *                               65535 = no penalty (idle/straight), spikes on sharp turns,
+ *                               decays toward ~150-200 as boat stabilizes
  *  Key 11 - Array[6] of int16: CURRENT HEADING per boat (scaled, * 360/65536)
  *                               Smoothly changing values confirmed against helm inputs
  *  Key 12 - Array[6] of int16: Rate of turn / angular velocity (converges toward 0)
- *  Key 13 - Array[12] of int16: Position pairs [x, y] for 6 boats (scaled coordinates)
- *                               Values in ~14000-30000 range, representing map positions
- *  Key 14 - Array[6] of int16: Unknown per-boat values (possibly speed or ranking related)
- *  Key 15 - Array[6]:          All zeros in capture (reserved?)
- *  Key 16 - Array[6]:          All zeros in capture (reserved?)
+ *  Key 13 - Array[12] of int16: Position pairs [x, y] for 6 boats (game coordinates)
+ *                               Values in ~13000-30000 range. ~125 ticks/sec, position
+ *                               delta ~30-40 units/tick at full speed
+ *  Key 14 - Array[6] of uint16: BOAT SPEED (proportional to position change rate)
+ *                               ~10000 = full speed, decays toward 0 when stopped/turning
+ *                               Correlates directly with sqrt(dx²+dy²)/dt
+ *  Key 15 - Array[6] of uint16: RACE PROGRESS (ramps 0→200 over race duration)
+ *                               Only non-zero for actively racing boats
+ *  Key 16 - Array[6] of uint16: DISTANCE SAILED or score accumulator
+ *                               Ramps 0→65535 over race, only for active boats
  *
  * The 6-element arrays correspond to the 6 boats in the race.
  */
@@ -235,8 +241,10 @@ export function decodeState(bytes) {
   const targets = raw[4] || [];      // target heading
   const turnRates = raw[12] || [];   // rate of turn
   const positions = raw[13] || [];   // [x, y] pairs interleaved
-  const field10 = raw[10] || [];     // unknown metric
-  const field14 = raw[14] || [];     // unknown metric
+  const field10 = raw[10] || [];     // maneuver penalty
+  const field14 = raw[14] || [];     // speed (proportional)
+  const field15 = raw[15] || [];     // race progress
+  const field16 = raw[16] || [];     // distance sailed
 
   for (let i = 0; i < boatCount; i++) {
     const boat = {
@@ -246,8 +254,10 @@ export function decodeState(bytes) {
       turnRate: i < turnRates.length ? turnRates[i] : null,
       posX: (i * 2) < positions.length ? positions[i * 2] : null,
       posY: (i * 2 + 1) < positions.length ? positions[i * 2 + 1] : null,
-      field10: i < field10.length ? field10[i] : null,
-      field14: i < field14.length ? field14[i] : null,
+      speed: i < field14.length ? field14[i] : null,
+      penaltyTimer: i < field10.length ? field10[i] : null,
+      raceProgress: i < field15.length ? field15[i] : null,
+      distanceSailed: i < field16.length ? field16[i] : null,
     };
     result.boats.push(boat);
   }
@@ -270,7 +280,9 @@ export function formatStateDebug(state) {
     const target = b.targetHeading !== null ? b.targetHeading.toFixed(1) + '\u00b0' : '?';
     const turn = b.turnRate !== null ? b.turnRate : '?';
     const pos = b.posX !== null ? `(${b.posX},${b.posY})` : '(?,?)';
-    lines.push(`  boat[${b.slot}]: hdg=${heading} tgt=${target} turn=${turn} pos=${pos}`);
+    const spd = b.speed !== null ? `spd=${b.speed}` : 'spd=?';
+    const penalty = b.penaltyTimer !== null ? (b.penaltyTimer === 65535 ? 'idle' : `pen=${b.penaltyTimer}`) : '';
+    lines.push(`  boat[${b.slot}]: hdg=${heading} ${spd} tgt=${target} turn=${turn} pos=${pos} ${penalty}`);
   }
   return lines.join('\n');
 }

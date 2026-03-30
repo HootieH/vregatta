@@ -6,6 +6,7 @@
   <title>vRegatta Dashboard</title>
   <link rel="stylesheet" href="leaflet.css">
   <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="mfd.css">
 </head>
 <body>
   <div id="panel-tabs">
@@ -13,6 +14,7 @@
     <button class="panel-tab active" data-panel="globe-3d">Globe</button>
     <button class="panel-tab" data-panel="polar-chart">Polar</button>
     <button class="panel-tab" data-panel="perf-chart">Perf</button>
+    <button class="panel-tab" data-panel="mfd">MFD</button>
     <button id="wind-toggle" class="panel-tab active" title="Toggle wind overlay">Wind</button>
     <button id="route-toggle" class="panel-tab" title="Toggle route advisor">Route</button>
     <button id="help-btn" class="panel-tab" title="Help &amp; Instructions">?</button>
@@ -26,6 +28,9 @@
     <div id="polar-chart" class="panel" style="display:none;"></div>
     <div id="perf-chart" class="panel" style="display:none;">
       <div id="perf-history"></div>
+    </div>
+    <div id="mfd" class="panel" style="display:none;">
+      <div id="mfd-container"></div>
     </div>
   </div>
   <div id="route-panel"></div>

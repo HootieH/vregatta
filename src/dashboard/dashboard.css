@@ -415,6 +415,22 @@ html, body {
 .layline-port { color: #ff4444; }
 .layline-stbd { color: #44cc44; }
 
+/* MFD panel */
+#mfd {
+  overflow: hidden;
+  min-width: 0;
+}
+
+#mfd-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* When MFD is active, panels take full remaining height */
+body.mfd-active #panels {
+  height: calc(100vh - 52px);
+}
+
 /* Performance panel */
 #perf-chart {
   overflow-y: auto;

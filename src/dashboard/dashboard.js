@@ -18,6 +18,9 @@ import { adviseBestHeading } from '../routing/heading-advisor.js';
 import { computeLaylines } from '../routing/layline.js';
 import { computeIsochrone } from '../routing/simple-isochrone.js';
 import { initOnboarding } from './onboarding.js';
+import { initMFDLayout } from './mfd-layout.js';
+import { bestVMG } from '../polars/best-vmg.js';
+import { computeSpeedEfficiency } from '../analytics/performance.js';
 
 const map = init2DMap('map-2d');
 const globe = init3DGlobe('globe-3d');
@@ -25,6 +28,7 @@ const hud = initHUD();
 const polarChart = initPolarChart('polar-chart');
 const perfChart = initPerfChart('perf-chart');
 const perfHistory = initPerfHistory('perf-history');
+const mfdLayout = initMFDLayout('mfd-container');
 
 initSplitPanel();
 
@@ -145,13 +149,16 @@ function updatePanelLayout() {
   const globeEl = document.getElementById('globe-3d');
   const polarEl = document.getElementById('polar-chart');
   const perfEl = document.getElementById('perf-chart');
+  const mfdEl = document.getElementById('mfd');
   const splitter = document.getElementById('splitter');
   const panels = document.getElementById('panels');
+  const hudEl = document.getElementById('hud');
 
   const showMap = activePanels.has('map-2d');
   const showGlobe = activePanels.has('globe-3d');
   const showPolar = activePanels.has('polar-chart');
   const showPerf = activePanels.has('perf-chart');
+  const showMfd = activePanels.has('mfd');
 
   // Get visible panels (max 2)
   const visible = [];
@@ -159,13 +166,21 @@ function updatePanelLayout() {
   if (showGlobe) visible.push(globeEl);
   if (showPolar) visible.push(polarEl);
   if (showPerf) visible.push(perfEl);
+  if (showMfd) visible.push(mfdEl);
 
   // Hide all first
   mapEl.style.display = 'none';
   globeEl.style.display = 'none';
   polarEl.style.display = 'none';
   perfEl.style.display = 'none';
+  mfdEl.style.display = 'none';
   splitter.style.display = 'none';
+
+  // Hide HUD when MFD is active (instruments replace it)
+  if (hudEl) {
+    hudEl.style.display = showMfd ? 'none' : '';
+  }
+  document.body.classList.toggle('mfd-active', showMfd);
 
   if (visible.length === 0) {
     panels.style.gridTemplateColumns = '1fr';
@@ -194,6 +209,7 @@ function updatePanelLayout() {
     if (globe && showGlobe) globe.resize();
     if (polarChart && showPolar) polarChart.resize();
     if (perfChart && showPerf) perfChart.resize();
+    if (mfdLayout && showMfd) mfdLayout.resize();
   }, 50);
 }
 
@@ -257,6 +273,24 @@ const bridge = createDataBridge((snapshot, positionHistory) => {
     const opts = snapshot.race?.options || [];
     perfChart.update(snapshot.boat, cachedPolar, opts);
     bridge.addPerfSnapshot(snapshot.boat, cachedPolar, opts);
+  }
+
+  // MFD instrument updates
+  if (mfdLayout && activePanels.has('mfd') && snapshot) {
+    // Enrich snapshot with computed data for instruments
+    const enriched = { ...snapshot };
+    if (cachedPolar && snapshot.boat) {
+      const opts = snapshot.race?.options || [];
+      enriched._polar = cachedPolar;
+      enriched._options = opts;
+      try {
+        const best = bestVMG(snapshot.boat.tws, cachedPolar, opts);
+        enriched._bestVMG = best;
+        enriched._vmgAngles = { twaUp: best.twaUp, twaDown: best.twaDown };
+      } catch { /* no polar data for this TWS */ }
+      enriched._polarEff = computeSpeedEfficiency(snapshot.boat, cachedPolar, opts);
+    }
+    mfdLayout.updateAll(enriched);
   }
 
   // Wind updates
@@ -327,4 +361,5 @@ window.addEventListener('resize', () => {
   if (globe) globe.resize();
   if (polarChart) polarChart.resize();
   if (perfChart) perfChart.resize();
+  if (mfdLayout) mfdLayout.resize();
 });

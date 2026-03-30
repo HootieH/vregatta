@@ -325,8 +325,62 @@ Chrome Extension (data layer) → Local storage/API → Tool modules (analysis, 
 
 ---
 
+---
+
+# Phase 19: Inshore Live Data Pipeline
+
+**Goal:** Wire decoded Colyseus data (headings, positions, state) into the live dashboard so Inshore races show real-time boat positions, tracks, and instruments.
+
+| Task | What to do |
+|------|-----------|
+| 19.1 | Create `src/colyseus/inshore-pipeline.js` — takes decoded state (from state-decoder), extracts per-boat data into normalized format: `{boats: [{id, heading, x, y, rateOfTurn, slot}], tick, raw}` |
+| 19.2 | Update background.js `ws-state` handler: decompress + decode state, normalize via pipeline, update LiveState with Inshore boat data |
+| 19.3 | Update LiveState to track Inshore boats (Map of slot → boat state), expose via getSnapshot as `inshoreBaots` |
+| 19.4 | Update data-bridge to pass Inshore data to dashboard components |
+| 19.5 | Update map-2d to render Inshore boat positions from decoded x,y (coordinate mapping TBD — may need to determine Inshore coordinate system) |
+| 19.6 | Tests for inshore-pipeline normalizer |
+
+---
+
+# Phase 20: MFD Instrument Dashboard
+
+**Goal:** Redesign dashboard as a race boat Multi-Function Display (MFD) — individual instrument panels for speed, heading, wind, VMG, polar, each in their own dockable/resizable cell. Like a B&G/Garmin cockpit display.
+
+| Task | What to do |
+|------|-----------|
+| 20.1 | Create `src/dashboard/mfd-layout.js` — CSS Grid-based MFD layout manager. User-configurable grid (e.g., 3x2 or 4x2). Each cell hosts one instrument. Drag to rearrange. Save layout to localStorage |
+| 20.2 | Create `src/dashboard/instruments/speed-display.js` — large digital speed readout (like B&G Vulcan). Current speed in huge font, max speed small below, unit label. Green/yellow/red based on polar efficiency |
+| 20.3 | Create `src/dashboard/instruments/heading-display.js` — compass tape or digital heading. Shows heading + COG. Rotating compass ring with boat-up orientation |
+| 20.4 | Create `src/dashboard/instruments/wind-display.js` — circular wind instrument. True wind angle/speed on outer ring, apparent on inner. Wind direction arrow. Like a B&G wind display |
+| 20.5 | Create `src/dashboard/instruments/vmg-display.js` — VMG gauge with target VMG comparison. Shows % of target. Up/down arrows for upwind/downwind |
+| 20.6 | Create `src/dashboard/instruments/polar-mini.js` — compact polar diagram showing current angle on the polar curve. Highlight optimal angle |
+| 20.7 | Create `src/dashboard/instruments/track-display.js` — mini map showing boat track, heading projection, laylines. Compact version of the main map |
+| 20.8 | Create `src/dashboard/instruments/start-timer-display.js` — countdown timer instrument for race starts |
+| 20.9 | Create `src/dashboard/instruments/stats-display.js` — session stats: distance, avg speed, tacks, gybes, efficiency |
+| 20.10 | Update dashboard.html/css — new "MFD" view mode alongside existing Map/Globe/Polar/Perf. MFD shows configurable grid of instruments |
+| 20.11 | Dark cockpit theme: black background, green/amber/red instrument colors, high contrast, designed for glancing at quickly while racing |
+| 20.12 | 2D map + 3D globe both visible simultaneously as MFD cells (not just split panel — each is an instrument in the grid) |
+
+---
+
+# Phase 21: Track & Trajectory Enhancement
+
+**Goal:** Make boat tracks and projected trajectories more visible and useful for learning.
+
+| Task | What to do |
+|------|-----------|
+| 21.1 | Color-code track by speed (green=fast, red=slow relative to polar) |
+| 21.2 | Color-code track by VMG efficiency (green=optimal, red=poor) |
+| 21.3 | Show tack/gybe markers on track with quality scores |
+| 21.4 | Heading projection line with time marks (where will I be in 1min, 5min, 10min) |
+| 21.5 | Ghost track: overlay optimal track computed from polars for comparison |
+| 21.6 | Track breadcrumbs with wind barbs at each position (shows wind field over time) |
+
+---
+
 ## Current Execution State
-- **Phases 1-17 + telemetry:** COMPLETE (2026-03-29)
-- **178 tests passing**, 19 test files, lint clean, build clean
-- **Next:** Phase 18 (Race Strategy Trainer) or live testing
-- Extension ready to load in Chrome and test against live VR Offshore race
+- **Phases 1-18 + telemetry + Colyseus decoder:** COMPLETE (2026-03-29)
+- **247 tests passing**, 22 test files, lint clean, build clean
+- **Active:** Phase 19 (Inshore pipeline) + Phase 20 (MFD instruments)
+- Colyseus protocol decoded: headings, positions, server ticks from live Inshore races
+- Extension live at https://github.com/HootieH/vregatta
