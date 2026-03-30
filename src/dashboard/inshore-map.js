@@ -156,7 +156,7 @@ export function initInshoreMap(containerId) {
   }
 
   let lastMapRender = 0;
-  const MAP_RENDER_INTERVAL = 500; // render map at max 2fps — smooth enough, saves CPU
+  const MAP_RENDER_INTERVAL = 100; // render at 10fps for smooth boat motion
 
   function update(snapshot) {
     if (!snapshot || !snapshot.inshoreActive) return;
@@ -246,12 +246,24 @@ export function initInshoreMap(containerId) {
 
         entry = { marker, label, trail, trailCoords: [] };
         boats.set(boat.slot, entry);
+
+        // Enable CSS transitions for smooth movement
+        const markerEl = entry.marker.getElement?.();
+        if (markerEl) markerEl.style.transition = 'transform 100ms linear';
+        const labelEl = entry.label.getElement?.();
+        if (labelEl) labelEl.style.transition = 'transform 100ms linear';
       }
 
-      // Update marker position and icon
+      // Update marker position and icon — CSS transition handles smooth animation
       entry.marker.setLatLng(pos);
       entry.marker.setIcon(createBoatIcon(boat.heading, color, size, opacity));
       entry.label.setLatLng(pos);
+
+      // Ensure transition stays applied (icon replacement can reset it)
+      const markerEl = entry.marker.getElement?.();
+      if (markerEl && !markerEl.style.transition) markerEl.style.transition = 'transform 100ms linear';
+      const labelEl = entry.label.getElement?.();
+      if (labelEl && !labelEl.style.transition) labelEl.style.transition = 'transform 100ms linear';
 
       // Update label text (player name may arrive later from Master)
       const updatedLabel = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));

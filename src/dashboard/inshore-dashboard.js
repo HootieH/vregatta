@@ -36,8 +36,8 @@ let lastKnownFleetSize = 0;
 const inshoreTrackHistory = new Map();
 const MAX_TRACK = 200;
 
-// Polling
-const POLL_MS = 200;
+// Polling — 100ms (10/sec) for smooth boat motion on map
+const POLL_MS = 100;
 let waitingOverlay = document.getElementById('waiting-overlay');
 let hasReceivedData = false;
 
