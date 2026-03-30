@@ -21,6 +21,8 @@ import { initOnboarding } from './onboarding.js';
 import { initMFDLayout } from './mfd-layout.js';
 import { bestVMG } from '../polars/best-vmg.js';
 import { computeSpeedEfficiency } from '../analytics/performance.js';
+import { detectEncounters } from '../rules/encounter-detector.js';
+import { initRulesPanel } from './rules-panel.js';
 
 const map = init2DMap('map-2d');
 const globe = init3DGlobe('globe-3d');
@@ -45,6 +47,9 @@ const windStrip = initWindStrip('wind-strip');
 // Route advisor
 const routeOverlay = initRouteOverlay(map, globe);
 const routePanel = initRoutePanel('route-panel');
+
+// Racing Rules panel
+const rulesPanel = initRulesPanel('rules-panel');
 
 // Wind strip collapsible toggle
 const windStripToggle = document.getElementById('wind-strip-toggle');
@@ -76,6 +81,17 @@ if (routeToggleBtn) {
     routeToggleBtn.classList.toggle('active', routingActive);
     if (routePanelEl) routePanelEl.classList.toggle('visible', routingActive);
     if (routeOverlay) routeOverlay.toggle();
+  });
+}
+
+// Rules toggle button
+const rulesToggleBtn = document.getElementById('rules-toggle');
+const rulesPanelEl = document.getElementById('rules-panel');
+
+if (rulesToggleBtn) {
+  rulesToggleBtn.addEventListener('click', () => {
+    const isVisible = rulesPanelEl?.classList.toggle('visible');
+    rulesToggleBtn.classList.toggle('active', isVisible);
   });
 }
 
@@ -291,6 +307,16 @@ const bridge = createDataBridge((snapshot, positionHistory) => {
       enriched._polarEff = computeSpeedEfficiency(snapshot.boat, cachedPolar, opts);
     }
     mfdLayout.updateAll(enriched);
+  }
+
+  // Racing Rules encounter detection (Inshore only)
+  if (rulesPanel && snapshot?.inshoreActive && snapshot.inshorePlayerBoat) {
+    const encounters = detectEncounters(
+      snapshot.inshorePlayerBoat,
+      snapshot.inshoreBoats || [],
+      snapshot.inshoreWindDirection,
+    );
+    rulesPanel.update(encounters);
   }
 
   // Wind updates

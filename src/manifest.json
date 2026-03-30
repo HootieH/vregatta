@@ -36,6 +36,10 @@
     {
       "resources": ["dashboard/dashboard.html", "dashboard/dashboard.js", "dashboard/dashboard.css", "dashboard/leaflet.css"],
       "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["rules/rule-page.html", "rules/rule-page.css", "rules/rule-page.js"],
+      "matches": ["<all_urls>"]
     }
   ],
   "icons": {
