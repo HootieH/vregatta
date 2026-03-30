@@ -29,6 +29,7 @@ export default [
         localStorage: 'readonly',
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
+        performance: 'readonly',
         atob: 'readonly',
         btoa: 'readonly',
         Buffer: 'readonly',

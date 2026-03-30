@@ -123,6 +123,57 @@ export function initInshoreMap(containerId) {
 
   let firstUpdate = true;
 
+  // --- Interpolation state per boat ---
+  // Each boat stores: {prevX, prevY, prevHdg, targetX, targetY, targetHdg, startTime, duration}
+  const interpState = new Map();
+  const INTERP_DURATION = 120; // ms — time to interpolate between updates (matches ~8fps data rate)
+
+  function lerpAngle(a, b, t) {
+    let delta = b - a;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    return a + delta * t;
+  }
+
+  function getInterpolated(slot, now) {
+    const s = interpState.get(slot);
+    if (!s) return null;
+    const elapsed = now - s.startTime;
+    const t = Math.min(elapsed / s.duration, 1);
+    return {
+      x: s.prevX + (s.targetX - s.prevX) * t,
+      y: s.prevY + (s.targetY - s.prevY) * t,
+      heading: lerpAngle(s.prevHdg, s.targetHdg, t),
+    };
+  }
+
+  function setTarget(slot, x, y, heading) {
+    const existing = interpState.get(slot);
+    const now = performance.now();
+    if (existing) {
+      // Start interpolating from current interpolated position
+      const current = getInterpolated(slot, now);
+      interpState.set(slot, {
+        prevX: current?.x ?? x,
+        prevY: current?.y ?? y,
+        prevHdg: current?.heading ?? heading,
+        targetX: x,
+        targetY: y,
+        targetHdg: heading,
+        startTime: now,
+        duration: INTERP_DURATION,
+      });
+    } else {
+      // First time — snap to position
+      interpState.set(slot, {
+        prevX: x, prevY: y, prevHdg: heading,
+        targetX: x, targetY: y, targetHdg: heading,
+        startTime: now,
+        duration: INTERP_DURATION,
+      });
+    }
+  }
+
   function drawGrid(centerX, centerY) {
     gridGroup.clearLayers();
     const step = 1000;
@@ -165,15 +216,8 @@ export function initInshoreMap(containerId) {
     return [boat.x, boat.y];
   }
 
-  let lastMapRender = 0;
-  const MAP_RENDER_INTERVAL = 100; // render at 10fps for smooth boat motion
-
   function update(snapshot) {
     if (!snapshot || !snapshot.inshoreActive) return;
-
-    const now = Date.now();
-    if (!firstUpdate && now - lastMapRender < MAP_RENDER_INTERVAL) return;
-    lastMapRender = now;
 
     // Use accumulated fleet (all known boats) if available, fall back to visible-only
     const allBoats = snapshot.inshoreAllBoats && snapshot.inshoreAllBoats.length > 0
@@ -183,6 +227,11 @@ export function initInshoreMap(containerId) {
     const playerBoat = visibleBoats.find(b => b.isPlayer) || allBoats.find(b => b.isPlayer);
     const trackHistory = snapshot._inshoreTrackHistory || {};
     const accStats = snapshot.inshoreAccStats;
+
+    // Set interpolation targets for all boats
+    for (const boat of allBoats) {
+      setTarget(boat.slot, boat.x, boat.y, boat.heading);
+    }
 
     // Update fleet names from snapshot
     if (snapshot.inshoreFleet && snapshot.inshoreFleet.length > 0) {
@@ -237,45 +286,28 @@ export function initInshoreMap(containerId) {
       let entry = boats.get(boat.slot);
       if (!entry) {
         const marker = L.marker(pos, { icon: createBoatIcon(boat.heading, color, size, opacity), zIndexOffset: boat.isPlayer ? 1000 : 0 }).addTo(map);
-        const labelText = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
-        const labelClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
-        const labelWidth = Math.max(40, Math.min(labelText.length * 7, 120));
         const label = L.marker(pos, {
-          icon: L.divIcon({
-            html: `<span class="${labelClass}" style="opacity:${opacity}">${labelText}</span>`,
-            iconSize: [labelWidth, 14],
-            iconAnchor: [labelWidth / 2, -10],
-            className: '',
-          }),
+          icon: L.divIcon({ html: '', iconSize: [1, 1], className: '' }),
           interactive: false,
         }).addTo(map);
-
-        const trail = L.polyline([], {
-          color,
-          opacity: isStale ? 0.2 : 0.4,
-          weight: 1.5,
-        }).addTo(map);
-
-        entry = { marker, label, trail, trailCoords: [] };
+        const trail = L.polyline([], { color, opacity: isStale ? 0.2 : 0.4, weight: 1.5 }).addTo(map);
+        entry = { marker, label, trail, trailCoords: [], lastColor: color, lastSize: size, lastOpacity: opacity };
         boats.set(boat.slot, entry);
-
-        // Enable CSS transitions for smooth movement
-        const markerEl = entry.marker.getElement?.();
-        if (markerEl) markerEl.style.transition = 'transform 100ms linear';
-        const labelEl = entry.label.getElement?.();
-        if (labelEl) labelEl.style.transition = 'transform 100ms linear';
       }
 
-      // Update marker position and icon — CSS transition handles smooth animation
-      entry.marker.setLatLng(pos);
-      entry.marker.setIcon(createBoatIcon(boat.heading, color, size, opacity));
-      entry.label.setLatLng(pos);
+      // Only rebuild icon when color/size/opacity changes (NOT every frame)
+      if (entry.lastColor !== color || entry.lastSize !== size || entry.lastOpacity !== opacity) {
+        entry.lastColor = color;
+        entry.lastSize = size;
+        entry.lastOpacity = opacity;
+      }
 
-      // Ensure transition stays applied (icon replacement can reset it)
-      const markerEl = entry.marker.getElement?.();
-      if (markerEl && !markerEl.style.transition) markerEl.style.transition = 'transform 100ms linear';
-      const labelEl = entry.label.getElement?.();
-      if (labelEl && !labelEl.style.transition) labelEl.style.transition = 'transform 100ms linear';
+      // Store boat metadata for the animation loop
+      entry.boatData = boat;
+      entry.color = color;
+      entry.size = size;
+      entry.opacity = opacity;
+      entry.isStale = isStale;
 
       // Update label text — name + speed in knots
       const nameLabel = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
@@ -356,7 +388,7 @@ export function initInshoreMap(containerId) {
 
     // Draw marks
     for (const mark of marks) {
-      const pos = [-mark.y, mark.x];
+      const pos = [mark.x, mark.y];
       const existing = markMarkers.get(mark.id);
       if (existing) {
         existing.setLatLng(pos);
@@ -397,6 +429,45 @@ export function initInshoreMap(containerId) {
   function resize() {
     map.invalidateSize();
   }
+
+  // --- 60fps animation loop for smooth boat interpolation ---
+  let lastIconUpdate = new Map(); // slot -> {heading, color}
+
+  function animate() {
+    const now = performance.now();
+    for (const [slot, entry] of boats) {
+      const interp = getInterpolated(slot, now);
+      if (!interp) continue;
+
+      const pos = [interp.x, interp.y];
+      entry.marker.setLatLng(pos);
+      entry.label.setLatLng(pos);
+
+      // Only rebuild icon when heading changes by >2° or color changed
+      const last = lastIconUpdate.get(slot);
+      const hdgRounded = Math.round(interp.heading);
+      if (!last || Math.abs(last.heading - hdgRounded) >= 2 || last.color !== entry.color) {
+        entry.marker.setIcon(createBoatIcon(hdgRounded, entry.color, entry.size, entry.opacity));
+        lastIconUpdate.set(slot, { heading: hdgRounded, color: entry.color });
+      }
+    }
+
+    // Update heading projection line from interpolated player position
+    const playerSlot = [...boats.entries()].find(([, e]) => e.boatData?.isPlayer)?.[0];
+    if (playerSlot != null) {
+      const pi = getInterpolated(playerSlot, now);
+      if (pi) {
+        const hdgRad = (pi.heading * Math.PI) / 180;
+        const projLen = 2000;
+        headingLine.setLatLngs([[pi.x, pi.y], [pi.x + projLen * Math.cos(hdgRad), pi.y + projLen * Math.sin(hdgRad)]]);
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  // Start animation loop
+  requestAnimationFrame(animate);
 
   return { update, updateMarks, updateEncounters, resize };
 }
