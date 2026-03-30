@@ -227,7 +227,8 @@ export function initInshoreMap(containerId) {
       ? snapshot.inshoreAllBoats
       : (snapshot.inshoreBoats || []);
     const visibleBoats = snapshot.inshoreBoats || [];
-    const playerBoat = visibleBoats.find(b => b.isPlayer) || allBoats.find(b => b.isPlayer);
+    // Use detected player, or fall back to first visible boat
+    const playerBoat = visibleBoats.find(b => b.isPlayer) || allBoats.find(b => b.isPlayer) || visibleBoats[0] || null;
     const trackHistory = snapshot._inshoreTrackHistory || {};
     const accStats = snapshot.inshoreAccStats;
 

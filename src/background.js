@@ -218,6 +218,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'exportRace') {
     if (!db) { sendResponse({ ok: false, error: 'DB not ready' }); return true; }
+    if (!message.raceId) { sendResponse({ ok: false, error: 'No raceId provided' }); return true; }
     exportRace(db, message.raceId)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
@@ -602,6 +603,7 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const decoded_state = decodeState(decompressed);
           const normalized = normalizeInshoreState(decoded_state, playerDetector.getPlayerSlot());
           playerDetector.updateFromState(normalized);
+          playerDetector.updateFallback(normalized); // fallback if no helm inputs
           const updateResult = state.updateInshore(normalized);
           fleetManager.updateFromGame(normalized);
 

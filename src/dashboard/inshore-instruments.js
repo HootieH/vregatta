@@ -50,7 +50,9 @@ export function initInshoreInstruments() {
 
   function update(snapshot) {
     if (!snapshot) return;
-    const p = snapshot.inshorePlayerBoat;
+    // Use player boat if detected, otherwise fall back to first visible boat
+    const p = snapshot.inshorePlayerBoat
+      || (snapshot.inshoreBoats && snapshot.inshoreBoats.length > 0 ? snapshot.inshoreBoats[0] : null);
 
     if (!p) {
       for (const field of ['hdg', 'spd', 'twa', 'twd', 'vmg', 'pos', 'lap', 'timer']) {

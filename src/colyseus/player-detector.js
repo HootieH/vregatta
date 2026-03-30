@@ -56,11 +56,64 @@ export class PlayerDetector {
     }
   }
 
+  /**
+   * Fallback: pick a player using heuristics when no helm inputs available.
+   * Uses the boat with the highest heading variance (most active steering).
+   * @param {object} normalizedState
+   */
+  updateFallback(normalizedState) {
+    if (this.detectedSlot !== null) return; // already detected via helm
+    if (!normalizedState?.boats) return;
+
+    for (const boat of normalizedState.boats) {
+      if (!this._headingHistory) this._headingHistory = new Map();
+      if (!this._headingHistory.has(boat.slot)) this._headingHistory.set(boat.slot, []);
+      const hist = this._headingHistory.get(boat.slot);
+      hist.push(boat.heading);
+      if (hist.length > 100) hist.shift();
+    }
+
+    // After 50+ samples, pick the boat with most heading variance
+    if (!this._headingHistory || this._fallbackChecked) return;
+    const minSamples = 50;
+    let ready = true;
+    for (const [, hist] of this._headingHistory) {
+      if (hist.length < minSamples) { ready = false; break; }
+    }
+    if (!ready) return;
+
+    let bestSlot = null, bestVariance = 0;
+    for (const [slot, hist] of this._headingHistory) {
+      let totalChange = 0;
+      for (let i = 1; i < hist.length; i++) {
+        let d = Math.abs(hist[i] - hist[i - 1]);
+        if (d > 180) d = 360 - d;
+        totalChange += d;
+      }
+      if (totalChange > bestVariance) {
+        bestVariance = totalChange;
+        bestSlot = slot;
+      }
+    }
+
+    if (bestSlot !== null && bestVariance > 20) {
+      this.detectedSlot = bestSlot;
+      this.confidence = 0.3; // low confidence — heuristic only
+      this._fallbackChecked = true;
+    }
+  }
+
   /** @returns {number|null} the detected player slot, or null if not yet determined */
   getPlayerSlot() { return this.detectedSlot; }
 
   /** @returns {number} confidence 0-1 */
   getConfidence() { return this.confidence; }
+
+  /** @returns {string} 'helm' | 'fallback' | 'none' */
+  getMethod() {
+    if (this.detectedSlot === null) return 'none';
+    return this.confidence > 0.5 ? 'helm' : 'fallback';
+  }
 
   /** Reset all state (e.g., on race restart) */
   reset() {
@@ -68,5 +121,7 @@ export class PlayerDetector {
     this.scores.clear();
     this.detectedSlot = null;
     this.confidence = 0;
+    this._headingHistory = null;
+    this._fallbackChecked = false;
   }
 }
