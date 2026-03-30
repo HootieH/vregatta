@@ -117,18 +117,21 @@ export function initInshoreMap(containerId) {
     gridGroup.clearLayers();
     const step = 1000;
     const range = 10000;
+    // X=North (lat), Y=East (lng) — toLatLng returns [x, y]
     const startX = Math.floor((centerX - range) / step) * step;
     const startY = Math.floor((centerY - range) / step) * step;
 
-    for (let x = startX; x <= centerX + range; x += step) {
-      L.polyline([[-centerY - range, x], [-centerY + range, x]], {
+    // Vertical lines (constant Y, varying X=North)
+    for (let y = startY; y <= centerY + range; y += step) {
+      L.polyline([[centerX - range, y], [centerX + range, y]], {
         color: GRID_COLOR,
         weight: 0.5,
         opacity: 0.5,
       }).addTo(gridGroup);
     }
-    for (let y = startY; y <= centerY + range; y += step) {
-      L.polyline([[-y, centerX - range], [-y, centerX + range]], {
+    // Horizontal lines (constant X, varying Y=East)
+    for (let x = startX; x <= centerX + range; x += step) {
+      L.polyline([[x, centerY - range], [x, centerY + range]], {
         color: GRID_COLOR,
         weight: 0.5,
         opacity: 0.5,
@@ -146,8 +149,10 @@ export function initInshoreMap(containerId) {
     return COMPETITOR_COLOR;
   }
 
+  // Coordinate convention: X=North, Y=East, heading=atan2(dy,dx)
+  // For Leaflet CRS.Simple: lat=north=X, lng=east=Y
   function toLatLng(boat) {
-    return [-boat.y, boat.x];
+    return [boat.x, boat.y];
   }
 
   let lastMapRender = 0;
@@ -280,14 +285,15 @@ export function initInshoreMap(containerId) {
     }
 
     // Heading projection for player
+    // Coordinate system: X=North, Y=East, heading=atan2(dy,dx)
+    // So: endX = x + cos(heading), endY = y + sin(heading)
     if (playerBoat) {
       const pos = toLatLng(playerBoat);
       const hdgRad = (playerBoat.heading * Math.PI) / 180;
-      // Project 2000 game units ahead
       const projLen = 2000;
-      const endX = playerBoat.x + projLen * Math.sin(hdgRad);
-      const endY = playerBoat.y + projLen * Math.cos(hdgRad);
-      headingLine.setLatLngs([pos, [-endY, endX]]);
+      const endX = playerBoat.x + projLen * Math.cos(hdgRad);
+      const endY = playerBoat.y + projLen * Math.sin(hdgRad);
+      headingLine.setLatLngs([pos, [endX, endY]]);
     }
 
     // Auto-zoom: fit visible boats (not stale) with padding
