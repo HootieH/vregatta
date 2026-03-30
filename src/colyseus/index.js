@@ -16,3 +16,9 @@ export {
   decodeMsgpack,
   scaledToHeading,
 } from './state-decoder.js';
+
+export {
+  detectMarks,
+  detectCurrentLeg,
+  isApproachingMark,
+} from './mark-detector.js';

@@ -28,6 +28,9 @@ import { initTrackMarkers } from './track-markers.js';
 import { initHeadingProjection } from './heading-projection.js';
 import { initGhostTrack } from './ghost-track.js';
 import { initWindFieldTrack } from './wind-field-track.js';
+import { initMarkOverlay } from './mark-overlay.js';
+import { detectMarks, detectCurrentLeg, isApproachingMark } from '../colyseus/mark-detector.js';
+import { createStateHistory } from '../colyseus/inshore-pipeline.js';
 
 const map = init2DMap('map-2d');
 const globe = init3DGlobe('globe-3d');
@@ -55,6 +58,13 @@ const routePanel = initRoutePanel('route-panel');
 
 // Racing Rules panel
 const rulesPanel = initRulesPanel('rules-panel');
+
+// Mark detection for Inshore
+const markOverlay = initMarkOverlay(map);
+const inshoreStateHistory = createStateHistory(500);
+let detectedMarks = [];
+let lastMarkDetection = 0;
+const MARK_DETECTION_INTERVAL = 2000;
 
 // Track enhancement modules
 const trackRenderer = initTrackRenderer(map);
@@ -381,6 +391,61 @@ const bridge = createDataBridge((snapshot, positionHistory) => {
       snapshot.inshoreWindDirection,
     );
     rulesPanel.update(encounters);
+  }
+
+  // Inshore mark detection
+  if (snapshot?.inshoreActive && snapshot.inshoreBoats) {
+    // Accumulate state history for mark detection
+    const stateForHistory = {
+      tick: snapshot.inshoreTick ?? Date.now(),
+      boats: snapshot.inshoreBoats,
+    };
+    inshoreStateHistory.push(stateForHistory);
+
+    // Run mark detection every MARK_DETECTION_INTERVAL ms
+    const now = Date.now();
+    if (now - lastMarkDetection >= MARK_DETECTION_INTERVAL) {
+      lastMarkDetection = now;
+      const result = detectMarks(inshoreStateHistory.getHistory());
+      detectedMarks = result.marks;
+
+      // Compute leg info for the player boat
+      const player = snapshot.inshorePlayerBoat;
+      let legInfo = null;
+      if (player && detectedMarks.length > 0) {
+        legInfo = detectCurrentLeg(player, detectedMarks);
+
+        // Check mark approach for alert
+        if (legInfo.nextMark && isApproachingMark(player, legInfo.nextMark)) {
+          // Feed approach info to rules panel if available
+          if (rulesPanel && legInfo.distanceToMark < 1500) {
+            const markAlert = {
+              rule: 'mark',
+              otherBoat: null,
+              distance: legInfo.distanceToMark,
+              situation: 'mark_approach',
+              playerRole: null,
+              urgency: legInfo.distanceToMark < 500 ? 'critical' : 'high',
+              description: `Approaching ${legInfo.nextMark.id} (${legInfo.distanceToMark} units) -- rounding to ${
+                detectedMarks.find(m => m.id === legInfo.nextMark.id)?.roundingDirection ?? 'unknown'
+              }`,
+            };
+            // Prepend to encounters
+            const currentEncounters = detectEncounters(
+              snapshot.inshorePlayerBoat,
+              snapshot.inshoreBoats || [],
+              snapshot.inshoreWindDirection,
+            );
+            rulesPanel.update([markAlert, ...currentEncounters]);
+          }
+        }
+      }
+
+      // Update mark overlay on map
+      if (markOverlay) {
+        markOverlay.update(detectedMarks, player, legInfo);
+      }
+    }
   }
 
   // Wind updates

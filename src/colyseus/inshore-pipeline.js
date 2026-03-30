@@ -7,9 +7,14 @@
  * Protocol field mapping (confirmed from 200-message capture analysis):
  *   Field 0  = boat slot IDs (6 boats per race)
  *   Field 1  = server tick (~125/sec)
- *   Field 3  = per-boat state flags (-1=inactive?, 0=normal, 1/2=racing?)
+ *   Field 2  = race event code ([0]=normal, [2]=tacking event, [32]/[3]/[4]=other)
+ *   Field 3  = per-boat tack direction flags (-1=port tack, 0=straight, 1=starboard tack)
  *   Field 4  = WIND DIRECTION (same for all boats, scaled heading, e.g., 179.0°)
+ *   Field 5  = always [0] (unused)
  *   Field 6  = [16] — possibly wind speed (16kn?) or race config
+ *   Field 7  = always [0] (unused)
+ *   Field 8  = always [0] (unused)
+ *   Field 9  = always [0] (unused)
  *   Field 10 = maneuver penalty timer (65535=no penalty, spikes on sharp turns)
  *   Field 11 = current heading per boat (scaled int16 * 360/65536)
  *   Field 12 = rate of turn (converges to 0)
@@ -17,6 +22,11 @@
  *   Field 14 = boat speed (proportional, ~10000=full speed, 0=stopped)
  *   Field 15 = race progress (0→200, only non-zero for player boat)
  *   Field 16 = distance sailed accumulator (0→65535, player boat only)
+ *   Field 23 = always [0,0,0,0,0,0] (unused)
+ *   Field 24 = always 0 (unused)
+ *
+ * Mark positions are NOT directly transmitted in the protocol. Detection relies
+ * on analyzing boat convergence + turn-rate patterns (see mark-detector.js).
  *
  * Player boat = index 0 (confirmed: only boat with field 15/16 non-zero + active heading changes)
  */
@@ -134,12 +144,49 @@ export function normalizeInshoreState(decodedState) {
     });
   }
 
+  // Extract protocol fields useful for mark detection context
+  const raceEventCode = decodedState.raw?.[2]?.[0] ?? 0;
+  const tackFlags = Array.isArray(decodedState.raw?.[3]) ? [...decodedState.raw[3]] : [];
+
   return {
     tick: decodedState.tick ?? 0,
     boats,
     windDirection,
     windSpeed,
+    raceEventCode,
+    tackFlags,
     playerBoatIndex: 0,
     timestamp: Date.now(),
+  };
+}
+
+/**
+ * Accumulator for Inshore state history, used by mark detection.
+ * Keeps a rolling window of normalized states.
+ *
+ * @param {number} [maxSize=500] - Maximum number of states to retain
+ * @returns {{push: function, getHistory: function, clear: function, size: function}}
+ */
+export function createStateHistory(maxSize) {
+  const max = maxSize ?? 500;
+  const history = [];
+
+  return {
+    push(normalizedState) {
+      if (!normalizedState) return;
+      history.push(normalizedState);
+      if (history.length > max) {
+        history.splice(0, history.length - max);
+      }
+    },
+    getHistory() {
+      return history;
+    },
+    clear() {
+      history.length = 0;
+    },
+    size() {
+      return history.length;
+    },
   };
 }
