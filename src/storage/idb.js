@@ -1,5 +1,5 @@
 const DB_NAME = 'vregatta';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /**
  * Opens the vregatta IndexedDB database, creating object stores on first run.
@@ -38,6 +38,11 @@ export function openDB() {
       if (event.oldVersion < 2) {
         // polars: keyed by _id
         db.createObjectStore('polars', { keyPath: '_id' });
+      }
+
+      if (event.oldVersion < 3) {
+        // raceReplays: complete Inshore race recordings, keyed by raceId
+        db.createObjectStore('raceReplays', { keyPath: 'raceId' });
       }
     };
 
@@ -216,6 +221,71 @@ export function exportRace(db, raceId) {
 
     tx.oncomplete = () => resolve(result);
     tx.onerror = (event) => reject(event.target.error);
+  });
+}
+
+// --- Race Replay CRUD ---
+
+/**
+ * Save a complete race replay to IndexedDB.
+ * @param {IDBDatabase} db
+ * @param {object} raceData — { raceId, states, events, marks, startTime, endTime, duration, ... }
+ * @returns {Promise}
+ */
+export function saveReplay(db, raceData) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('raceReplays', 'readwrite');
+    const store = tx.objectStore('raceReplays');
+    const request = store.put(raceData);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+/**
+ * Retrieve a single race replay by raceId.
+ * @param {IDBDatabase} db
+ * @param {string} raceId
+ * @returns {Promise<object|null>}
+ */
+export function getReplay(db, raceId) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('raceReplays', 'readonly');
+    const store = tx.objectStore('raceReplays');
+    const request = store.get(raceId);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+/**
+ * List all saved replays (returns array of race data objects).
+ * @param {IDBDatabase} db
+ * @returns {Promise<Array<object>>}
+ */
+export function listReplays(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('raceReplays', 'readonly');
+    const store = tx.objectStore('raceReplays');
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+/**
+ * Delete a race replay by raceId.
+ * @param {IDBDatabase} db
+ * @param {string} raceId
+ * @returns {Promise}
+ */
+export function deleteReplay(db, raceId) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('raceReplays', 'readwrite');
+    const store = tx.objectStore('raceReplays');
+    const request = store.delete(raceId);
+    request.onsuccess = () => resolve();
+    request.onerror = (event) => reject(event.target.error);
   });
 }
 

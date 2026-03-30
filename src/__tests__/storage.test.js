@@ -27,7 +27,7 @@ describe('openDB', () => {
     const db = await openDB();
     expect(db.name).toBe('vregatta');
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['actions', 'boatStates', 'competitors', 'polars', 'races', 'windSnapshots'].sort()
+      ['actions', 'boatStates', 'competitors', 'polars', 'raceReplays', 'races', 'windSnapshots'].sort()
     );
     db.close();
   });

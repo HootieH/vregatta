@@ -17,6 +17,10 @@ import {
   savePolar,
   getPolar,
   exportRace,
+  saveReplay,
+  getReplay,
+  listReplays,
+  deleteReplay,
 } from './storage/idb.js';
 import { LiveState } from './state/live-state.js';
 import { decompressStateAsync } from './colyseus/decoder.js';
@@ -249,6 +253,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     setLogLevel(message.level);
     log.info(`Log level set to ${message.level}`);
     sendResponse({ ok: true });
+    return true;
+  }
+
+  // --- Replay CRUD handlers ---
+  if (message.type === 'saveReplay') {
+    if (!db) { sendResponse({ ok: false, error: 'DB not ready' }); return true; }
+    saveReplay(db, message.raceData)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'getReplay') {
+    if (!db) { sendResponse({ replay: null }); return true; }
+    getReplay(db, message.raceId)
+      .then((replay) => sendResponse({ replay }))
+      .catch(() => sendResponse({ replay: null }));
+    return true;
+  }
+
+  if (message.type === 'listReplays') {
+    if (!db) { sendResponse({ replays: [] }); return true; }
+    listReplays(db)
+      .then((replays) => sendResponse({ replays }))
+      .catch(() => sendResponse({ replays: [] }));
+    return true;
+  }
+
+  if (message.type === 'deleteReplay') {
+    if (!db) { sendResponse({ ok: false, error: 'DB not ready' }); return true; }
+    deleteReplay(db, message.raceId)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 

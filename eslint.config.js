@@ -17,6 +17,7 @@ export default [
         setTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
+        clearTimeout: 'readonly',
         fetch: 'readonly',
         Request: 'readonly',
         Response: 'readonly',

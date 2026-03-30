@@ -31,6 +31,9 @@ import { initWindFieldTrack } from './wind-field-track.js';
 import { initMarkOverlay } from './mark-overlay.js';
 import { detectMarks, detectCurrentLeg, isApproachingMark } from '../colyseus/mark-detector.js';
 import { createStateHistory } from '../colyseus/inshore-pipeline.js';
+import { RaceRecorder } from '../storage/race-recorder.js';
+import { initReplayPlayer } from './replay-player.js';
+import { initReplayPanel } from './replay-panel.js';
 
 const map = init2DMap('map-2d');
 const globe = init3DGlobe('globe-3d');
@@ -65,6 +68,14 @@ const inshoreStateHistory = createStateHistory(500);
 let detectedMarks = [];
 let lastMarkDetection = 0;
 const MARK_DETECTION_INTERVAL = 2000;
+
+// --- Replay system ---
+const raceRecorder = new RaceRecorder();
+const replayPlayer = initReplayPlayer('replay-controls-bar');
+const replayPanel = initReplayPanel('replay-panel');
+let replayActive = false;
+let inshoreDataStopTimer = null;
+const INSHORE_STOP_TIMEOUT = 10000; // 10 seconds of no data = race ended
 
 // Track enhancement modules
 const trackRenderer = initTrackRenderer(map);
@@ -166,6 +177,89 @@ if (rulesToggleBtn) {
   rulesToggleBtn.addEventListener('click', () => {
     const isVisible = rulesPanelEl?.classList.toggle('visible');
     rulesToggleBtn.classList.toggle('active', isVisible);
+  });
+}
+
+// Replay toggle button
+const replayToggleBtn = document.getElementById('replay-toggle');
+const replayPanelEl = document.getElementById('replay-panel');
+
+if (replayToggleBtn) {
+  replayToggleBtn.addEventListener('click', () => {
+    const isVisible = replayPanelEl?.classList.toggle('visible');
+    replayToggleBtn.classList.toggle('active', isVisible);
+    if (isVisible) {
+      // Request replay list from background
+      chrome.runtime.sendMessage({ type: 'listReplays' }, (response) => {
+        if (chrome.runtime.lastError || !response) return;
+        if (replayPanel) replayPanel.setReplays(response.replays || []);
+      });
+    }
+  });
+}
+
+// Replay panel: load a replay
+if (replayPanel) {
+  replayPanel.onLoadReplay((raceId) => {
+    chrome.runtime.sendMessage({ type: 'getReplay', raceId }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.replay) return;
+      replayActive = true;
+      if (replayPlayer) {
+        replayPlayer.loadRace(response.replay);
+      }
+      if (replayPanel) {
+        replayPanel.showAnalysis(response.replay);
+      }
+    });
+  });
+
+  replayPanel.onDeleteReplay((raceId) => {
+    chrome.runtime.sendMessage({ type: 'deleteReplay', raceId }, () => {
+      if (chrome.runtime.lastError) return;
+      // Refresh list
+      chrome.runtime.sendMessage({ type: 'listReplays' }, (resp) => {
+        if (resp) replayPanel.setReplays(resp.replays || []);
+      });
+    });
+  });
+
+  replayPanel.onTimelineClick((tick) => {
+    if (!replayPlayer || !replayPlayer.isActive()) return;
+    // Approximate: seek to tick / 10 (since ticks are ~10 apart at 12.5/sec from 125/sec)
+    replayPlayer.seek(Math.round(tick / 10));
+  });
+}
+
+// Replay player state change: feed into dashboard components
+if (replayPlayer) {
+  replayPlayer.onStateChange((snapshot) => {
+    if (!replayActive) return;
+    // Feed the replay snapshot into the same update path as live data
+    sync.onBoatUpdate(snapshot, []);
+    if (hud) hud.update(snapshot);
+
+    // Inshore map update
+    if (map) map.updateInshore(snapshot);
+
+    // Inshore track update
+    if (trackRenderer && snapshot._inshoreTrackHistory) {
+      trackRenderer.updateInshore(snapshot._inshoreTrackHistory, cachedPolar, []);
+    }
+
+    // Rules panel
+    if (rulesPanel && snapshot.inshorePlayerBoat) {
+      const encounters = detectEncounters(
+        snapshot.inshorePlayerBoat,
+        snapshot.inshoreBoats || [],
+        snapshot.inshoreWindDirection,
+      );
+      rulesPanel.update(encounters);
+    }
+
+    // Compass rose
+    if (compassRose && snapshot.inshoreWindDirection != null) {
+      compassRose.update(snapshot.inshoreWindDirection, null);
+    }
   });
 }
 
@@ -391,6 +485,47 @@ const bridge = createDataBridge((snapshot, positionHistory) => {
       snapshot.inshoreWindDirection,
     );
     rulesPanel.update(encounters);
+  }
+
+  // --- Auto-record Inshore races ---
+  if (snapshot?.inshoreActive && snapshot.inshoreBoats && !replayActive) {
+
+    // Auto-start recording when Inshore data begins flowing
+    if (!raceRecorder.isRecording()) {
+      const raceId = `inshore_${Date.now()}`;
+      raceRecorder.startRecording(raceId);
+    }
+
+    // Feed state to recorder (it throttles internally)
+    raceRecorder.addState({
+      tick: snapshot.inshoreTick,
+      boats: snapshot.inshoreBoats,
+      windDirection: snapshot.inshoreWindDirection,
+    });
+
+    // Feed events
+    if (snapshot.events) {
+      for (const evt of snapshot.events) {
+        raceRecorder.addEvent({ ...evt, tick: snapshot.inshoreTick });
+      }
+    }
+
+    // Reset stop timer
+    if (inshoreDataStopTimer) {
+      clearTimeout(inshoreDataStopTimer);
+    }
+    inshoreDataStopTimer = setTimeout(() => {
+      if (raceRecorder.isRecording()) {
+        const raceData = raceRecorder.stopRecording();
+        if (raceData && raceData.states.length > 10) {
+          // Persist to IndexedDB via background
+          chrome.runtime.sendMessage({
+            type: 'saveReplay',
+            raceData,
+          });
+        }
+      }
+    }, INSHORE_STOP_TIMEOUT);
   }
 
   // Inshore mark detection
