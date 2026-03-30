@@ -22,6 +22,8 @@ const copyStaticFiles = {
       mkdirSync('dist/dashboard', { recursive: true });
       cpSync('src/dashboard/dashboard.html', 'dist/dashboard/dashboard.html', { force: true });
       cpSync('src/dashboard/dashboard.css', 'dist/dashboard/dashboard.css', { force: true });
+      cpSync('src/dashboard/inshore-dashboard.html', 'dist/dashboard/inshore-dashboard.html', { force: true });
+      cpSync('src/dashboard/inshore-dashboard.css', 'dist/dashboard/inshore-dashboard.css', { force: true });
       // Leaflet CSS
       cpSync(resolve(__dirname, 'node_modules/leaflet/dist/leaflet.css'), 'dist/dashboard/leaflet.css', { force: true });
       // Rules page static files
@@ -43,7 +45,7 @@ const sharedOptions = {
 // Background and popup use ESM
 const esmBuild = {
   ...sharedOptions,
-  entryPoints: ['src/background.js', 'src/popup/popup.js', 'src/dashboard/dashboard.js', 'src/rules/rule-page.js'],
+  entryPoints: ['src/background.js', 'src/popup/popup.js', 'src/dashboard/dashboard.js', 'src/dashboard/inshore-dashboard.js', 'src/rules/rule-page.js'],
   outdir: 'dist',
   format: 'esm',
 };

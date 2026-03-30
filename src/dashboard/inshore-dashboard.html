@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vRegatta Inshore</title>
+  <link rel="stylesheet" href="leaflet.css">
+  <link rel="stylesheet" href="inshore-dashboard.css">
+</head>
+<body>
+  <div id="inshore-app">
+    <div id="race-map"></div>
+    <div id="rules-sidebar"></div>
+    <div id="instrument-bar"></div>
+    <div id="events-panel"></div>
+    <div id="waiting-overlay">
+      <div class="waiting-content">
+        <div class="waiting-icon">&#9973;</div>
+        <div class="waiting-title">Waiting for Inshore race...</div>
+        <div class="waiting-hint">Open Virtual Regatta Inshore and join a race.<br>Data will appear automatically.</div>
+      </div>
+    </div>
+  </div>
+  <script src="inshore-dashboard.js" type="module"></script>
+</body>
+</html>

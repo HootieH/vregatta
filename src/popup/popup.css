@@ -172,6 +172,41 @@ body {
   cursor: default;
 }
 
+#inshore-dashboard-btn {
+  width: 100%;
+  padding: 8px;
+  background: #3a86ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+#inshore-dashboard-btn:hover {
+  background: #2a76ef;
+}
+
+#dashboard-btn.secondary-btn {
+  width: 100%;
+  padding: 6px;
+  background: transparent;
+  color: #888;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+#dashboard-btn.secondary-btn:hover {
+  color: #ccc;
+  border-color: #666;
+}
+
 /* Debug section */
 
 /* Error alert — red, top of debug section, impossible to miss */

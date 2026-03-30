@@ -1,0 +1,445 @@
+/* Inshore Racing Dashboard — Dark cockpit theme */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a1a;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+}
+
+/* ---- Main Grid Layout ---- */
+#inshore-app {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr 120px;
+  height: 100vh;
+  width: 100vw;
+  gap: 2px;
+  background: #111;
+}
+
+#race-map {
+  grid-column: 1;
+  grid-row: 1;
+  background: #0a1628;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
+#rules-sidebar {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  background: rgba(13, 13, 36, 0.98);
+  border-left: 2px solid #1a2a4a;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+#instrument-bar {
+  grid-column: 1;
+  grid-row: 2;
+  background: #000;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#events-panel {
+  display: none; /* events go inside rules sidebar bottom */
+}
+
+/* ---- Waiting Overlay ---- */
+#waiting-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10, 10, 26, 0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+}
+
+#waiting-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.waiting-content {
+  text-align: center;
+}
+
+.waiting-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.waiting-title {
+  font-size: 20px;
+  color: #3a86ff;
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+.waiting-hint {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* ---- Instrument Cells ---- */
+.instr-cell {
+  flex: 1;
+  min-width: 100px;
+  background: #000;
+  border: 1px solid #1a1a2a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  position: relative;
+}
+
+.instr-label {
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+}
+
+.instr-value {
+  font-family: 'Courier New', monospace;
+  font-size: 36px;
+  font-weight: bold;
+  color: #00ff41;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.instr-sub {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Speed color variants */
+.instr-value.spd-green { color: #00ff41; }
+.instr-value.spd-yellow { color: #ffd600; }
+.instr-value.spd-red { color: #ff3333; }
+
+/* TWA tack colors */
+.instr-value.twa-port { color: #ff4444; }
+.instr-value.twa-stbd { color: #00e676; }
+
+/* VMG direction */
+.instr-value.vmg-up { color: #00e676; }
+.instr-value.vmg-down { color: #3a86ff; }
+
+/* Compass tape (mini) */
+.compass-tape {
+  width: 100%;
+  height: 16px;
+  margin-top: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.compass-tape canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Rules Sidebar (reused styles from rules-panel.js) ---- */
+.rules-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.rules-header-icon {
+  font-size: 16px;
+}
+
+.rules-header-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #3a86ff;
+  font-weight: bold;
+}
+
+.rules-idle-message {
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  padding: 12px 0 8px;
+}
+
+.rules-tip-card {
+  background: #12122a;
+  border: 1px solid #1a2a4a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.rules-tip-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #3a86ff;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.rules-tip-text {
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.5;
+}
+
+.rules-encounter-card {
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-left: 4px solid #44cc44;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.rules-encounter-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.rules-number-circle {
+  width: 36px;
+  height: 36px;
+  border: 2px solid #3a86ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #e0e0e0;
+  flex-shrink: 0;
+}
+
+.rules-encounter-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rules-encounter-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #e0e0e0;
+}
+
+.rules-encounter-urgency {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rules-role-badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.rules-role-giveway {
+  background: #4a1a1a;
+  color: #ff4444;
+  border: 1px solid #ff4444;
+}
+
+.rules-role-standon {
+  background: #1a4a1a;
+  color: #44cc44;
+  border: 1px solid #44cc44;
+}
+
+.rules-encounter-desc {
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.rules-encounter-action {
+  font-size: 11px;
+  color: #aaa;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+.rules-learn-btn {
+  background: transparent;
+  border: 1px solid #3a86ff;
+  color: #3a86ff;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rules-learn-btn:hover {
+  background: #3a86ff;
+  color: #fff;
+}
+
+/* ---- Events Section (inside rules sidebar) ---- */
+.events-section {
+  margin-top: 12px;
+  border-top: 1px solid #2a2a4a;
+  padding-top: 10px;
+}
+
+.events-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #111;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.event-dot.tack { background: #3a86ff; }
+.event-dot.gybe { background: #ff8c00; }
+.event-dot.mark { background: #00e676; }
+.event-dot.penalty { background: #ff3333; }
+.event-dot.rule { background: #a855f7; }
+
+.event-text {
+  color: #ccc;
+  flex: 1;
+}
+
+.event-time {
+  color: #555;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* ---- Map Styles ---- */
+.leaflet-container {
+  background: #0a1628 !important;
+}
+
+/* Wind indicator on map */
+.map-wind-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(10, 10, 26, 0.85);
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.map-wind-arrow {
+  width: 24px;
+  height: 24px;
+}
+
+.map-wind-label {
+  font-size: 12px;
+  color: #00b4d8;
+  font-weight: bold;
+}
+
+/* Boat labels on map */
+.boat-label {
+  font-family: monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.boat-label-player {
+  color: #3a86ff;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 800px) {
+  #inshore-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 120px auto;
+  }
+
+  #rules-sidebar {
+    grid-column: 1;
+    grid-row: 3;
+    border-left: none;
+    border-top: 2px solid #1a2a4a;
+    max-height: 300px;
+  }
+
+  .instr-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 500px) {
+  #instrument-bar {
+    flex-wrap: wrap;
+  }
+
+  .instr-cell {
+    min-width: 80px;
+    flex-basis: 33%;
+  }
+
+  .instr-value {
+    font-size: 20px;
+  }
+}

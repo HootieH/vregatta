@@ -172,6 +172,10 @@ function handleDashboard() {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
 }
 
+function handleInshoreDashboard() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/inshore-dashboard.html') });
+}
+
 // --- Debug section ---
 let rawCaptureActive = false;
 
@@ -267,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(fetchStatus, 10000);
   setInterval(fetchDebugStats, 5000);
   document.getElementById('export-btn').addEventListener('click', handleExport);
+  document.getElementById('inshore-dashboard-btn').addEventListener('click', handleInshoreDashboard);
   document.getElementById('dashboard-btn').addEventListener('click', handleDashboard);
   document.getElementById('debug-overlay-btn').addEventListener('click', handleToggleDebugOverlay);
   document.getElementById('raw-capture-btn').addEventListener('click', handleToggleRawCapture);

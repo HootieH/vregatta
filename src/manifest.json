@@ -38,6 +38,10 @@
       "matches": ["<all_urls>"]
     },
     {
+      "resources": ["dashboard/inshore-dashboard.html", "dashboard/inshore-dashboard.js", "dashboard/inshore-dashboard.css"],
+      "matches": ["<all_urls>"]
+    },
+    {
       "resources": ["rules/rule-page.html", "rules/rule-page.css", "rules/rule-page.js"],
       "matches": ["<all_urls>"]
     }
