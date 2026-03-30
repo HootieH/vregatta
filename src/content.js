@@ -23,6 +23,16 @@ window.addEventListener('message', (event) => {
     return;
   }
 
+  // Forward WebSocket connected notification
+  if (event.data.type === 'vr-ws-connected') {
+    chrome.runtime.sendMessage({
+      type: 'ws-connected',
+      url: event.data.url,
+      timestamp: event.data.timestamp,
+    });
+    return;
+  }
+
   // Forward WebSocket intercepted messages
   if (event.data.type === 'vr-ws-intercepted') {
     chrome.runtime.sendMessage({

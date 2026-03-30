@@ -159,6 +159,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message.type === 'ws-connected') {
+    detectedInshore = true;
+    log.info(`VR WebSocket connected: ${message.url}`);
+    autoEnableRawCapture('WebSocket connected — capturing from start');
+    return false;
+  }
+
   if (message.type === 'logFromInjected') {
     const injectedLog = createLogger('injected');
     const level = message.level ?? LogLevel.DEBUG;

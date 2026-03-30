@@ -116,6 +116,16 @@
         return ws;
       }
 
+      // Notify background immediately on connection (before any data flows)
+      try {
+        window.postMessage(
+          { type: 'vr-ws-connected', url: wsUrl, timestamp: Date.now() },
+          '*',
+        );
+      } catch {
+        // Never break the game
+      }
+
       vrLog(1, 'Inshore detected — capturing WebSocket traffic for analysis', { url: wsUrl });
 
       // Intercept incoming messages via addEventListener wrapper

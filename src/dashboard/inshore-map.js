@@ -10,22 +10,24 @@ const PLAYER_COLOR = '#3a86ff';
 const COMPETITOR_COLOR = '#ff9f1c';
 const GIVEWAY_COLOR = '#ff3333';
 const STANDON_COLOR = '#00e676';
+const STALE_COLOR = '#888888';
 const MARK_COLOR = '#ff8c00';
 const GRID_COLOR = '#1a2a3a';
 const TRACK_MAX_POINTS = 60; // ~30 seconds at 2 updates/sec
 
-function createBoatArrowSvg(heading, color, size) {
+function createBoatArrowSvg(heading, color, size, opacity) {
+  const op = opacity ?? 0.9;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <g transform="rotate(${heading}, ${size / 2}, ${size / 2})">
       <polygon points="${size / 2},2 ${size * 0.25},${size - 2} ${size / 2},${size * 0.7} ${size * 0.75},${size - 2}"
-               fill="${color}" stroke="#fff" stroke-width="1" opacity="0.9"/>
+               fill="${color}" stroke="#fff" stroke-width="1" opacity="${op}"/>
     </g>
   </svg>`;
 }
 
-function createBoatIcon(heading, color, size) {
+function createBoatIcon(heading, color, size, opacity) {
   return L.divIcon({
-    html: createBoatArrowSvg(heading, color, size),
+    html: createBoatArrowSvg(heading, color, size, opacity),
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     className: '',
@@ -83,6 +85,13 @@ export function initInshoreMap(containerId) {
   windEl.className = 'map-wind-indicator';
   windEl.innerHTML = '<div class="map-wind-arrow"></div><div class="map-wind-label">---</div>';
   container.appendChild(windEl);
+
+  // Fleet counter overlay
+  const fleetCounterEl = document.createElement('div');
+  fleetCounterEl.className = 'map-fleet-counter';
+  fleetCounterEl.style.cssText = 'position:absolute;bottom:8px;left:8px;z-index:1000;background:rgba(0,0,0,0.7);color:#ccc;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;pointer-events:none;';
+  fleetCounterEl.textContent = '';
+  container.appendChild(fleetCounterEl);
 
   // Heading projection line for player
   const headingLine = L.polyline([], {
@@ -142,11 +151,16 @@ export function initInshoreMap(containerId) {
   }
 
   function update(snapshot) {
-    if (!snapshot || !snapshot.inshoreActive || !snapshot.inshoreBoats) return;
+    if (!snapshot || !snapshot.inshoreActive) return;
 
-    const allBoats = snapshot.inshoreBoats;
-    const playerBoat = allBoats.find(b => b.isPlayer);
+    // Use accumulated fleet (all known boats) if available, fall back to visible-only
+    const allBoats = snapshot.inshoreAllBoats && snapshot.inshoreAllBoats.length > 0
+      ? snapshot.inshoreAllBoats
+      : (snapshot.inshoreBoats || []);
+    const visibleBoats = snapshot.inshoreBoats || [];
+    const playerBoat = visibleBoats.find(b => b.isPlayer) || allBoats.find(b => b.isPlayer);
     const trackHistory = snapshot._inshoreTrackHistory || {};
+    const accStats = snapshot.inshoreAccStats;
 
     // Update fleet names from snapshot
     if (snapshot.inshoreFleet && snapshot.inshoreFleet.length > 0) {
@@ -176,24 +190,35 @@ export function initInshoreMap(containerId) {
       windEl.querySelector('.map-wind-label').textContent = `${Math.round(wd)}`;
     }
 
-    // Track active slots
+    // Update fleet counter
+    if (accStats) {
+      const vis = accStats.currentlyVisible;
+      const known = accStats.totalSeen;
+      fleetCounterEl.textContent = `Visible: ${vis} / Known: ${known} / Race: 18`;
+    }
+
+    // Track active slots (all known boats now)
     const activeSlots = new Set();
+    const visibleSlots = new Set(visibleBoats.map(b => b.slot));
 
     for (const boat of allBoats) {
       activeSlots.add(boat.slot);
       const pos = toLatLng(boat);
-      const color = getBoatColor(boat);
+      const isVisible = boat.visible !== false && visibleSlots.has(boat.slot);
+      const isStale = boat.stale === true || !isVisible;
+      const color = boat.isPlayer ? PLAYER_COLOR : (isStale ? STALE_COLOR : getBoatColor(boat));
+      const opacity = boat.isPlayer ? 0.9 : (isStale ? 0.4 : 0.9);
       const size = boat.isPlayer ? 28 : 20;
 
       let entry = boats.get(boat.slot);
       if (!entry) {
-        const marker = L.marker(pos, { icon: createBoatIcon(boat.heading, color, size), zIndexOffset: boat.isPlayer ? 1000 : 0 }).addTo(map);
-        const labelText = getBoatLabel(boat);
+        const marker = L.marker(pos, { icon: createBoatIcon(boat.heading, color, size, opacity), zIndexOffset: boat.isPlayer ? 1000 : 0 }).addTo(map);
+        const labelText = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
         const labelClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
         const labelWidth = Math.max(40, Math.min(labelText.length * 7, 120));
         const label = L.marker(pos, {
           icon: L.divIcon({
-            html: `<span class="${labelClass}">${labelText}</span>`,
+            html: `<span class="${labelClass}" style="opacity:${opacity}">${labelText}</span>`,
             iconSize: [labelWidth, 14],
             iconAnchor: [labelWidth / 2, -10],
             className: '',
@@ -203,7 +228,7 @@ export function initInshoreMap(containerId) {
 
         const trail = L.polyline([], {
           color,
-          opacity: 0.4,
+          opacity: isStale ? 0.2 : 0.4,
           weight: 1.5,
         }).addTo(map);
 
@@ -213,30 +238,31 @@ export function initInshoreMap(containerId) {
 
       // Update marker position and icon
       entry.marker.setLatLng(pos);
-      entry.marker.setIcon(createBoatIcon(boat.heading, color, size));
+      entry.marker.setIcon(createBoatIcon(boat.heading, color, size, opacity));
       entry.label.setLatLng(pos);
 
       // Update label text (player name may arrive later from Master)
-      const updatedLabel = getBoatLabel(boat);
+      const updatedLabel = boat.isPlayer ? 'YOU' : (isStale ? `${getBoatLabel(boat)}?` : getBoatLabel(boat));
       const updatedClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
       const updatedWidth = Math.max(40, Math.min(updatedLabel.length * 7, 120));
       entry.label.setIcon(L.divIcon({
-        html: `<span class="${updatedClass}">${updatedLabel}</span>`,
+        html: `<span class="${updatedClass}" style="opacity:${opacity}">${updatedLabel}</span>`,
         iconSize: [updatedWidth, 14],
         iconAnchor: [updatedWidth / 2, -10],
         className: '',
       }));
 
-      // Update trail from track history
-      const slotTrack = trackHistory[boat.slot];
+      // Update trail from accumulated track history or dashboard track history
+      const accTrack = boat.trackHistory;
+      const slotTrack = accTrack && accTrack.length > 1 ? accTrack : trackHistory[boat.slot];
       if (slotTrack && slotTrack.length > 1) {
         const coords = slotTrack.slice(-TRACK_MAX_POINTS).map(p => [-p.y, p.x]);
         entry.trail.setLatLngs(coords);
-        entry.trail.setStyle({ color });
+        entry.trail.setStyle({ color, opacity: isStale ? 0.2 : 0.4 });
       }
     }
 
-    // Remove stale boats
+    // Remove boats no longer in accumulated fleet
     for (const [slot, entry] of boats) {
       if (!activeSlots.has(slot)) {
         map.removeLayer(entry.marker);
@@ -257,16 +283,17 @@ export function initInshoreMap(containerId) {
       headingLine.setLatLngs([pos, [-endY, endX]]);
     }
 
-    // Auto-zoom: fit all boats with padding
-    if (allBoats.length > 0) {
-      const bounds = L.latLngBounds(allBoats.map(b => toLatLng(b)));
+    // Auto-zoom: fit visible boats (not stale) with padding
+    const boatsForZoom = allBoats.filter(b => visibleSlots.has(b.slot));
+    if (boatsForZoom.length > 0) {
+      const bounds = L.latLngBounds(boatsForZoom.map(b => toLatLng(b)));
 
       if (firstUpdate) {
         map.fitBounds(bounds.pad(0.5), { maxZoom: -1 });
         firstUpdate = false;
-      } else if (allBoats.length === 1) {
+      } else if (boatsForZoom.length === 1) {
         // Follow single boat
-        map.panTo(toLatLng(allBoats[0]), { animate: true, duration: 0.5 });
+        map.panTo(toLatLng(boatsForZoom[0]), { animate: true, duration: 0.5 });
       } else {
         // Gentle fit — only adjust if boats are outside current view
         const currentBounds = map.getBounds();

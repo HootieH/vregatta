@@ -1,3 +1,5 @@
+import { FleetAccumulator } from '../colyseus/fleet-accumulator.js';
+
 const MAX_HISTORY = 20;
 const MAX_EVENTS = 50;
 
@@ -10,6 +12,7 @@ export class LiveState {
     this.events = [];
     this.inshoreBoats = new Map();
     this.inshoreTick = 0;
+    this.fleetAccumulator = new FleetAccumulator();
   }
 
   updateBoat(newState) {
@@ -97,7 +100,7 @@ export class LiveState {
 
   updateInshore(normalizedState) {
     if (!normalizedState || !normalizedState.boats) {
-      return { changed: false, events: [] };
+      return { changed: false, events: [], newBoatSpotted: false };
     }
 
     let changed = false;
@@ -133,6 +136,9 @@ export class LiveState {
       this.inshoreBoats.set(boat.slot, boat);
     }
 
+    // Feed the fleet accumulator
+    const accResult = this.fleetAccumulator.update(normalizedState);
+
     for (const evt of detectedEvents) {
       this.events.push(evt);
     }
@@ -140,13 +146,17 @@ export class LiveState {
       this.events.splice(0, this.events.length - MAX_EVENTS);
     }
 
-    return { changed, events: detectedEvents };
+    return { changed, events: detectedEvents, newBoatSpotted: accResult.newBoatSpotted };
   }
 
   getSnapshot() {
     const playerBoat = this.inshoreBoats.size > 0
       ? Array.from(this.inshoreBoats.values()).find(b => b.isPlayer) ?? null
       : null;
+
+    // Accumulated fleet data
+    const accFleet = this.fleetAccumulator.getFleet();
+    const accStats = this.fleetAccumulator.getStats();
 
     return {
       boat: this.boat,
@@ -156,8 +166,10 @@ export class LiveState {
       events: this.events.slice(-5),
       connected: this.boat !== null || this.inshoreBoats.size > 0,
       inshoreBoats: Array.from(this.inshoreBoats.values()),
+      inshoreAllBoats: accFleet,
+      inshoreFleetSize: accStats.totalSeen,
       inshoreTick: this.inshoreTick,
-      inshoreActive: this.inshoreBoats.size > 0,
+      inshoreActive: this.inshoreBoats.size > 0 || accStats.totalSeen > 0,
       inshoreWindDirection: this.inshoreWindDirection ?? null,
       inshoreWindSpeed: this.inshoreWindSpeed ?? null,
       inshorePlayerBoat: playerBoat,
@@ -166,6 +178,7 @@ export class LiveState {
       inshorePointOfSail: playerBoat?.pointOfSail ?? null,
       inshoreVmg: playerBoat?.vmg ?? null,
       inshoreSpeed: playerBoat?.speedRaw ?? null,
+      inshoreAccStats: accStats,
       // Fleet data is added by background.js from FleetManager
       inshoreFleet: [],
       inshoreFleetStats: { total: 0, inRace: 0, withPosition: 0, withName: 0 },

@@ -28,6 +28,15 @@ const MARK_DETECTION_INTERVAL = 2000;
 // Fleet count display
 const fleetCountEl = document.getElementById('fleet-count');
 
+// New boat notification element
+let newBoatNotif = document.getElementById('new-boat-notif');
+if (!newBoatNotif) {
+  newBoatNotif = document.createElement('div');
+  newBoatNotif.id = 'new-boat-notif';
+  newBoatNotif.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;background:#2ecc71;color:#1a1a2e;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:13px;opacity:0;transition:opacity 0.3s;pointer-events:none;';
+  document.body.appendChild(newBoatNotif);
+}
+let lastKnownFleetSize = 0;
 
 // Track history per boat slot
 const inshoreTrackHistory = new Map();
@@ -72,14 +81,35 @@ function poll() {
       }
       snapshot._inshoreTrackHistory = Object.fromEntries(inshoreTrackHistory);
 
-      // --- Update fleet count display ---
-      if (fleetCountEl && snapshot.inshoreFleetStats) {
+      // --- Update fleet count display (accumulated) ---
+      const accStats = snapshot.inshoreAccStats;
+      if (fleetCountEl && accStats) {
+        const vis = accStats.currentlyVisible;
+        const known = accStats.totalSeen;
+        fleetCountEl.textContent = `Spotted ${known} of 18 boats (${vis} visible)`;
+        fleetCountEl.title = `${accStats.stale} stale (not seen for >5s)`;
+      } else if (fleetCountEl && snapshot.inshoreFleetStats) {
         const stats = snapshot.inshoreFleetStats;
         if (stats.total > 0) {
           const visible = snapshot.inshoreBoats ? snapshot.inshoreBoats.length : 0;
           fleetCountEl.textContent = `${visible}/${stats.total} boats visible`;
           fleetCountEl.title = `${stats.withName} named, ${stats.inRace} racing`;
         }
+      }
+
+      // --- New boat spotted notification ---
+      if (accStats && accStats.totalSeen > lastKnownFleetSize) {
+        const newCount = accStats.totalSeen - lastKnownFleetSize;
+        lastKnownFleetSize = accStats.totalSeen;
+        if (newBoatNotif && lastKnownFleetSize > 1) { // skip first batch
+          newBoatNotif.textContent = newCount === 1
+            ? `New boat spotted! (${accStats.totalSeen} total)`
+            : `${newCount} new boats spotted! (${accStats.totalSeen} total)`;
+          newBoatNotif.style.opacity = '1';
+          setTimeout(() => { newBoatNotif.style.opacity = '0'; }, 2500);
+        }
+      } else if (accStats) {
+        lastKnownFleetSize = accStats.totalSeen;
       }
 
       // --- Feed map ---
