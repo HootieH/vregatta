@@ -66,11 +66,12 @@ export function classify(url, body) {
  * Classifies a WebSocket message using the Colyseus protocol decoder.
  *
  * Binary messages starting with 0xf3 are decoded by type:
- *   0x04 -> ws-state    (ROOM_STATE — compressed game state)
- *   0x06 -> ws-helm-input (ROOM_DATA_SCHEMA — outgoing helm command)
- *   0x07 -> ws-ack      (ROOM_DATA_BYTES — server acknowledgement)
- *   0x03 -> ws-data     (ROOM_DATA — session/token data)
- *   0x02 -> ws-leave    (LEAVE_ROOM)
+ *   0x04 -> ws-state        (ROOM_STATE — compressed game state)
+ *   0x04 -> ws-master-state (ROOM_STATE from Master server — uncompressed)
+ *   0x06 -> ws-helm-input   (ROOM_DATA_SCHEMA — outgoing helm command)
+ *   0x07 -> ws-ack          (ROOM_DATA_BYTES — server acknowledgement)
+ *   0x03 -> ws-data         (ROOM_DATA — session/token data)
+ *   0x02 -> ws-leave        (LEAVE_ROOM)
  *
  * @param {string} url - The WebSocket URL
  * @param {object} data - Described message data from injected.js
@@ -80,9 +81,12 @@ export function classify(url, body) {
 export function classify_ws(url, data, direction) {
   if (!data) return { type: 'ws-unknown', wsType: null, data };
 
+  // Detect Master server by URL
+  const isMasterServer = url && url.includes('Master');
+
   // Binary messages — decode Colyseus protocol
   if (data.binary && data.base64) {
-    return classifyBinaryWs(data, direction);
+    return classifyBinaryWs(data, direction, isMasterServer);
   }
 
   if (data.binary) {
@@ -136,9 +140,10 @@ export function classify_ws(url, data, direction) {
  * Decodes a binary Colyseus message and classifies it by protocol type.
  * @param {object} data - Binary message data with base64 field
  * @param {string} direction - 'incoming' or 'outgoing'
+ * @param {boolean} isMasterServer - Whether the URL is a Master server
  * @returns {{type: string, wsType: string, data: object, meta?: object, decoded?: object}}
  */
-function classifyBinaryWs(data, direction) {
+function classifyBinaryWs(data, direction, isMasterServer) {
   let bytes;
   try {
     // Decode base64 to bytes
@@ -171,7 +176,17 @@ function classifyBinaryWs(data, direction) {
     0x02: 'ws-leave',
   };
 
-  const type = TYPE_MAP[typeByte] || 'ws-unknown';
+  let type = TYPE_MAP[typeByte] || 'ws-unknown';
+
+  // Master server: ROOM_STATE (0x04) is uncompressed Colyseus Schema,
+  // other types from Master get prefixed with 'ws-master-'
+  if (isMasterServer) {
+    if (typeByte === 0x04) {
+      type = 'ws-master-state';
+    } else if (TYPE_MAP[typeByte]) {
+      type = 'ws-master-data';
+    }
+  }
   const meta = { size: data.size, firstBytes: data.firstBytes || null, typeByte };
 
   // Attempt to decode known types

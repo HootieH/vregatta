@@ -25,6 +25,10 @@ let detectedMarks = [];
 let lastMarkDetection = 0;
 const MARK_DETECTION_INTERVAL = 2000;
 
+// Fleet count display
+const fleetCountEl = document.getElementById('fleet-count');
+
+
 // Track history per boat slot
 const inshoreTrackHistory = new Map();
 const MAX_TRACK = 200;
@@ -67,6 +71,16 @@ function poll() {
         }
       }
       snapshot._inshoreTrackHistory = Object.fromEntries(inshoreTrackHistory);
+
+      // --- Update fleet count display ---
+      if (fleetCountEl && snapshot.inshoreFleetStats) {
+        const stats = snapshot.inshoreFleetStats;
+        if (stats.total > 0) {
+          const visible = snapshot.inshoreBoats ? snapshot.inshoreBoats.length : 0;
+          fleetCountEl.textContent = `${visible}/${stats.total} boats visible`;
+          fleetCountEl.title = `${stats.withName} named, ${stats.inRace} racing`;
+        }
+      }
 
       // --- Feed map ---
       if (raceMap) raceMap.update(snapshot);
@@ -124,8 +138,11 @@ function poll() {
         if (raceMap) raceMap.updateMarks(detectedMarks);
       }
 
-      // Feed rules panel
-      if (rulesPanel) rulesPanel.update(encounters);
+      // Feed fleet names and rules panel
+      if (rulesPanel) {
+        if (snapshot.inshoreFleet) rulesPanel.updateFleet(snapshot.inshoreFleet);
+        rulesPanel.update(encounters);
+      }
 
       // --- Events ---
       if (snapshot.events && snapshot.events.length > lastEventCount) {

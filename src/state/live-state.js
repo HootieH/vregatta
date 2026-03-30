@@ -166,6 +166,9 @@ export class LiveState {
       inshorePointOfSail: playerBoat?.pointOfSail ?? null,
       inshoreVmg: playerBoat?.vmg ?? null,
       inshoreSpeed: playerBoat?.speedRaw ?? null,
+      // Fleet data is added by background.js from FleetManager
+      inshoreFleet: [],
+      inshoreFleetStats: { total: 0, inRace: 0, withPosition: 0, withName: 0 },
     };
   }
 }

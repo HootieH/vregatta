@@ -26,7 +26,7 @@ const URGENCY_LABELS = {
  * Initialize the rules panel.
  *
  * @param {string} containerId - DOM element ID for the rules panel container
- * @returns {{ update: function, openRule: function }}
+ * @returns {{ update: function, updateFleet: function, openRule: function }}
  */
 export function initRulesPanel(containerId) {
   const container = document.getElementById(containerId);
@@ -52,6 +52,8 @@ export function initRulesPanel(containerId) {
 
   const contentEl = container.querySelector('.rules-content');
   let lastTipRule = null;
+  /** @type {Map<number, string>} slot -> player name */
+  let fleetNames = new Map();
 
   function renderIdle() {
     const tip = getRandomRule();
@@ -89,6 +91,9 @@ export function initRulesPanel(containerId) {
       const color = URGENCY_COLORS[enc.urgency] || URGENCY_COLORS.low;
       const urgencyLabel = URGENCY_LABELS[enc.urgency] || '';
 
+      // Resolve other boat name from fleet
+      const otherName = enc.otherBoat != null ? (fleetNames.get(enc.otherBoat) || `Boat #${enc.otherBoat}`) : '';
+
       // Role badge
       let roleBadge = '';
       if (enc.playerRole === 'give-way') {
@@ -120,7 +125,7 @@ export function initRulesPanel(containerId) {
             </div>
             ${roleBadge}
           </div>
-          <div class="rules-encounter-desc">${enc.description}</div>
+          <div class="rules-encounter-desc">${otherName ? `<strong>${otherName}</strong> — ` : ''}${enc.description}</div>
           ${whatToDo ? `<div class="rules-encounter-action">${whatToDo}</div>` : ''}
           ${enc.rule ? `<button class="rules-learn-btn" data-rule="${enc.rule}">Learn more &rarr;</button>` : ''}
         </div>
@@ -170,6 +175,16 @@ export function initRulesPanel(containerId) {
   return {
     update(encounters) {
       renderEncounters(encounters);
+    },
+    updateFleet(fleet) {
+      fleetNames.clear();
+      if (fleet && Array.isArray(fleet)) {
+        for (const p of fleet) {
+          if (p.slotId != null && p.name) {
+            fleetNames.set(p.slotId, p.name);
+          }
+        }
+      }
     },
     openRule,
   };

@@ -26,6 +26,8 @@ import { LiveState } from './state/live-state.js';
 import { decompressStateAsync } from './colyseus/decoder.js';
 import { decodeState } from './colyseus/state-decoder.js';
 import { normalizeInshoreState } from './colyseus/inshore-pipeline.js';
+import { decodeMasterState, decodeMasterUpdate } from './colyseus/master-decoder.js';
+import { FleetManager } from './colyseus/fleet-manager.js';
 import { createLogger, getLogs, clearLogs, setLogLevel, getLogLevel, LogLevel } from './telemetry.js';
 
 const log = createLogger('background');
@@ -38,6 +40,8 @@ const stateLog = createLogger('state');
 
 let db = null;
 const state = new LiveState();
+const fleetManager = new FleetManager();
+const masterLog = createLogger('master-decoder');
 
 // Initialize DB — wrapped to avoid top-level await crash in some Chrome versions
 (async () => {
@@ -122,8 +126,8 @@ async function saveRawCapture(url, body) {
     const result = await chrome.storage.local.get('vregatta-raw-capture');
     const entries = result['vregatta-raw-capture'] || [];
     entries.push({ url, body, timestamp: Date.now() });
-    // FIFO cap at 100
-    while (entries.length > 100) {
+    // FIFO cap at 500 — large enough to catch initial race join data
+    while (entries.length > 500) {
       entries.shift();
     }
     await chrome.storage.local.set({ 'vregatta-raw-capture': entries });
@@ -166,7 +170,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'getStatus') {
-    sendResponse(state.getSnapshot());
+    const snapshot = state.getSnapshot();
+    snapshot.inshoreFleet = fleetManager.getFleet();
+    snapshot.inshoreFleetStats = fleetManager.getStats();
+    sendResponse(snapshot);
     return true;
   }
 
@@ -493,6 +500,29 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
       }
       break;
 
+    case 'ws-master-state':
+      if (data?.base64) {
+        try {
+          const raw = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
+          const masterResult = raw.length > 50
+            ? decodeMasterState(raw)
+            : decodeMasterUpdate(raw);
+          fleetManager.updateFromMaster(masterResult);
+          const named = masterResult.players.filter(p => p.name);
+          masterLog.info(`Master: ${masterResult.players.length} players (${named.length} named), size=${raw.length}`);
+          if (named.length > 0) {
+            masterLog.debug(`Named players: ${named.map(p => p.name).join(', ')}`);
+          }
+        } catch (err) {
+          masterLog.error(`Master state decode failed (size=${data?.size ?? '?'}): ${err.message}`);
+        }
+      }
+      break;
+
+    case 'ws-master-data':
+      masterLog.debug(`Master data (size=${data?.size ?? '?'})`, { direction });
+      break;
+
     case 'ws-state':
       if (data?.base64) {
         try {
@@ -502,6 +532,8 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const decoded_state = decodeState(decompressed);
           const normalized = normalizeInshoreState(decoded_state);
           state.updateInshore(normalized);
+          // Cross-reference with fleet manager
+          fleetManager.updateFromGame(normalized);
           const myBoat = normalized.boats[0];
           wsLog.info(`Inshore: ${normalized.boats.length} boats, tick=${normalized.tick}, my heading=${myBoat?.heading ?? '?'}°`);
         } catch (err) {
@@ -545,7 +577,7 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
     const captureResult = await chrome.storage.local.get('vregatta-raw-capture');
     const entries = captureResult['vregatta-raw-capture'] || [];
     entries.push(entry);
-    while (entries.length > 200) {
+    while (entries.length > 500) {
       entries.shift();
     }
     await chrome.storage.local.set({ 'vregatta-raw-capture': entries });

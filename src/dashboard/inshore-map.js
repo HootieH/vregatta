@@ -72,6 +72,8 @@ export function initInshoreMap(containerId) {
   const boats = new Map();
   // Encounter map: slot -> role ('give-way'|'stand-on')
   let encounterRoles = new Map();
+  // Fleet name lookup: slot -> playerName
+  let fleetNames = new Map();
   // Mark markers
   const markMarkers = new Map();
   let courseLine = null;
@@ -89,6 +91,16 @@ export function initInshoreMap(containerId) {
     weight: 1.5,
     dashArray: '6, 4',
   }).addTo(map);
+
+  function getBoatLabel(boat) {
+    if (boat.isPlayer) return 'YOU';
+    const name = fleetNames.get(boat.slot);
+    if (name) {
+      // Shorten long names (max 16 chars)
+      return name.length > 16 ? name.substring(0, 14) + '\u2026' : name;
+    }
+    return `#${boat.slot}`;
+  }
 
   let firstUpdate = true;
 
@@ -136,6 +148,16 @@ export function initInshoreMap(containerId) {
     const playerBoat = allBoats.find(b => b.isPlayer);
     const trackHistory = snapshot._inshoreTrackHistory || {};
 
+    // Update fleet names from snapshot
+    if (snapshot.inshoreFleet && snapshot.inshoreFleet.length > 0) {
+      fleetNames.clear();
+      for (const p of snapshot.inshoreFleet) {
+        if (p.slotId != null && p.name) {
+          fleetNames.set(p.slotId, p.name);
+        }
+      }
+    }
+
     // Draw grid around player on first update
     if (playerBoat && (!gridDrawn || !gridCenter)) {
       drawGrid(playerBoat.x, playerBoat.y);
@@ -166,13 +188,14 @@ export function initInshoreMap(containerId) {
       let entry = boats.get(boat.slot);
       if (!entry) {
         const marker = L.marker(pos, { icon: createBoatIcon(boat.heading, color, size), zIndexOffset: boat.isPlayer ? 1000 : 0 }).addTo(map);
-        const labelText = boat.isPlayer ? 'YOU' : `#${boat.slot}`;
+        const labelText = getBoatLabel(boat);
         const labelClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
+        const labelWidth = Math.max(40, Math.min(labelText.length * 7, 120));
         const label = L.marker(pos, {
           icon: L.divIcon({
             html: `<span class="${labelClass}">${labelText}</span>`,
-            iconSize: [40, 14],
-            iconAnchor: [20, -10],
+            iconSize: [labelWidth, 14],
+            iconAnchor: [labelWidth / 2, -10],
             className: '',
           }),
           interactive: false,
@@ -192,6 +215,17 @@ export function initInshoreMap(containerId) {
       entry.marker.setLatLng(pos);
       entry.marker.setIcon(createBoatIcon(boat.heading, color, size));
       entry.label.setLatLng(pos);
+
+      // Update label text (player name may arrive later from Master)
+      const updatedLabel = getBoatLabel(boat);
+      const updatedClass = boat.isPlayer ? 'boat-label boat-label-player' : 'boat-label';
+      const updatedWidth = Math.max(40, Math.min(updatedLabel.length * 7, 120));
+      entry.label.setIcon(L.divIcon({
+        html: `<span class="${updatedClass}">${updatedLabel}</span>`,
+        iconSize: [updatedWidth, 14],
+        iconAnchor: [updatedWidth / 2, -10],
+        className: '',
+      }));
 
       // Update trail from track history
       const slotTrack = trackHistory[boat.slot];
