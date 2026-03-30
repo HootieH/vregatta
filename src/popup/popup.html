@@ -119,6 +119,45 @@
           <span class="value"><span id="dbg-ws-total">0</span> <span id="dbg-ws-detail" class="dbg-ws-detail"></span></span>
         </div>
       </div>
+      <!-- Inshore telemetry -->
+      <div id="dbg-inshore-section" class="hidden" style="margin-top: 8px; border-top: 1px solid #2a2a4a; padding-top: 6px;">
+        <div class="section-label">Inshore Pipeline</div>
+        <div class="data-grid">
+          <div class="data-cell">
+            <span class="label">State decodes</span>
+            <span class="value" id="dbg-in-decodes">0</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Decode errors</span>
+            <span class="value" id="dbg-in-errors">0</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">State rate</span>
+            <span class="value"><span id="dbg-in-rate">0</span>/sec</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Decode latency</span>
+            <span class="value"><span id="dbg-in-latency">0</span>ms</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Boats spotted</span>
+            <span class="value" id="dbg-in-boats">0</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Helm inputs</span>
+            <span class="value" id="dbg-in-helms">0</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Master decodes</span>
+            <span class="value" id="dbg-in-master">0</span>
+          </div>
+          <div class="data-cell">
+            <span class="label">Connections</span>
+            <span class="value" id="dbg-in-conns">0</span>
+          </div>
+        </div>
+        <div id="dbg-in-slots" style="font-size: 10px; color: #666; margin-top: 4px;"></div>
+      </div>
     </div>
     <div class="debug-controls">
       <button id="debug-overlay-btn" class="debug-btn">Toggle Debug Overlay</button>

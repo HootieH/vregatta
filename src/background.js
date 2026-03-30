@@ -71,6 +71,17 @@ const stats = {
   pipelineErrors: 0,
   wsMessagesTotal: 0,
   wsClassifiedCounts: {},
+  // Inshore-specific telemetry
+  inshoreStateDecodes: 0,
+  inshoreStateErrors: 0,
+  inshoreMasterDecodes: 0,
+  inshoreMasterErrors: 0,
+  inshoreHelmInputs: 0,
+  inshoreBoatsSpotted: new Set(),    // all slots ever seen
+  inshoreLastStateTime: 0,
+  inshoreStateRate: 0,               // states/sec
+  inshoreDecodeLatency: [],           // last 20 decode durations in ms
+  inshoreConnectionUrls: new Set(),   // all WS URLs seen
 };
 
 // --- Game mode detection ---
@@ -161,7 +172,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'ws-connected') {
     detectedInshore = true;
-    log.info(`VR WebSocket connected: ${message.url}`);
+    stats.inshoreConnectionUrls.add(message.url);
+    const connType = message.url?.includes('Master') ? 'MASTER' : message.url?.includes('Game') ? 'GAME' : 'UNKNOWN';
+    log.info(`WS ${connType} connected: ${message.url} (${stats.inshoreConnectionUrls.size} total connections)`);
     autoEnableRawCapture('WebSocket connected — capturing from start');
     return false;
   }
@@ -211,6 +224,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       else if (detectedOffshore) gameMode = 'offshore';
       else if (detectedInshore) gameMode = 'inshore';
 
+      const avgDecodeLatency = stats.inshoreDecodeLatency.length > 0
+        ? stats.inshoreDecodeLatency.reduce((a, b) => a + b, 0) / stats.inshoreDecodeLatency.length
+        : 0;
+
       sendResponse({
         totalIntercepted: stats.totalIntercepted,
         classifiedCounts: { ...stats.classifiedCounts },
@@ -225,6 +242,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         wsMessagesTotal: stats.wsMessagesTotal,
         wsClassifiedCounts: { ...stats.wsClassifiedCounts },
         gameMode,
+        // Inshore telemetry
+        inshore: {
+          stateDecodes: stats.inshoreStateDecodes,
+          stateErrors: stats.inshoreStateErrors,
+          stateErrorRate: stats.inshoreStateDecodes > 0
+            ? ((stats.inshoreStateErrors / (stats.inshoreStateDecodes + stats.inshoreStateErrors)) * 100).toFixed(1) + '%'
+            : '0%',
+          masterDecodes: stats.inshoreMasterDecodes,
+          masterErrors: stats.inshoreMasterErrors,
+          helmInputs: stats.inshoreHelmInputs,
+          boatsSpotted: stats.inshoreBoatsSpotted.size,
+          boatSlots: [...stats.inshoreBoatsSpotted].sort((a, b) => a - b),
+          stateRate: stats.inshoreStateRate,
+          avgDecodeLatencyMs: avgDecodeLatency.toFixed(1),
+          connections: [...stats.inshoreConnectionUrls],
+        },
       });
     });
     return true;
@@ -494,10 +527,14 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
 
   switch (type) {
     case 'ws-helm-input':
+      stats.inshoreHelmInputs++;
       if (decoded && decoded.heading !== undefined) {
-        wsLog.info(`Decoded heading: ${decoded.heading}\u00b0 (raw=${decoded.raw})`, { direction });
+        const playerBoat = state.inshoreBoats?.values()?.next()?.value;
+        const currentHdg = playerBoat?.heading;
+        const delta = currentHdg != null ? (decoded.heading - currentHdg).toFixed(1) : '?';
+        wsLog.info(`Helm: ${decoded.heading.toFixed(1)}\u00b0 (delta=${delta}\u00b0, input #${stats.inshoreHelmInputs})`, { direction });
       } else {
-        wsLog.debug(`WS helm input (size=${data?.size ?? '?'}) — could not decode heading`, { direction });
+        wsLog.warn(`Helm input decode failed (size=${data?.size ?? '?'}, input #${stats.inshoreHelmInputs})`, { direction });
       }
       break;
 
@@ -514,14 +551,17 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const masterResult = raw.length > 50
             ? decodeMasterState(raw)
             : decodeMasterUpdate(raw);
+          stats.inshoreMasterDecodes++;
           fleetManager.updateFromMaster(masterResult);
           const named = masterResult.players.filter(p => p.name);
-          masterLog.info(`Master: ${masterResult.players.length} players (${named.length} named), size=${raw.length}`);
+          const fleet = fleetManager.getFleet();
+          masterLog.info(`Master #${stats.inshoreMasterDecodes}: ${masterResult.players.length} players (${named.length} named), fleet total=${fleet.length}, size=${raw.length}`);
           if (named.length > 0) {
-            masterLog.debug(`Named players: ${named.map(p => p.name).join(', ')}`);
+            masterLog.info(`Fleet: ${named.map(p => `${p.name} [slot=${p.slotId ?? '?'}]`).join(', ')}`);
           }
         } catch (err) {
-          masterLog.error(`Master state decode failed (size=${data?.size ?? '?'}): ${err.message}`);
+          stats.inshoreMasterErrors++;
+          masterLog.error(`Master decode failed #${stats.inshoreMasterErrors} (size=${data?.size ?? '?'}): ${err.message}`);
         }
       }
       break;
@@ -532,6 +572,7 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
 
     case 'ws-state':
       if (data?.base64) {
+        const t0 = Date.now();
         try {
           const raw = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
           const payload = raw.slice(2); // strip 0xf3 + type byte
@@ -539,15 +580,46 @@ async function handleWsIntercepted(url, data, direction, timestamp) {
           const decoded_state = decodeState(decompressed);
           const normalized = normalizeInshoreState(decoded_state);
           state.updateInshore(normalized);
-          // Cross-reference with fleet manager
           fleetManager.updateFromGame(normalized);
+
+          // Telemetry
+          stats.inshoreStateDecodes++;
+          const decodeMs = Date.now() - t0;
+          stats.inshoreDecodeLatency.push(decodeMs);
+          if (stats.inshoreDecodeLatency.length > 20) stats.inshoreDecodeLatency.shift();
+
+          // Track state rate
+          const now = Date.now();
+          if (stats.inshoreLastStateTime > 0) {
+            const dt = now - stats.inshoreLastStateTime;
+            stats.inshoreStateRate = dt > 0 ? Math.round(1000 / dt) : 0;
+          }
+          stats.inshoreLastStateTime = now;
+
+          // Track boats spotted
+          for (const b of normalized.boats) {
+            stats.inshoreBoatsSpotted.add(b.slot);
+          }
+
+          // Log at DEBUG (not INFO) — 125/sec is too noisy for INFO
           const myBoat = normalized.boats[0];
-          wsLog.info(`Inshore: ${normalized.boats.length} boats, tick=${normalized.tick}, my heading=${myBoat?.heading ?? '?'}°`);
+          wsLog.debug(`State: ${normalized.boats.length} boats, tick=${normalized.tick}, hdg=${myBoat?.heading?.toFixed(0) ?? '?'}°, spd=${myBoat?.speedRaw ?? '?'}`);
+
+          // Log summary at INFO every 500th decode
+          if (stats.inshoreStateDecodes % 500 === 0) {
+            const avgLatency = stats.inshoreDecodeLatency.reduce((a, b) => a + b, 0) / stats.inshoreDecodeLatency.length;
+            wsLog.info(`Inshore stats: ${stats.inshoreStateDecodes} states decoded, ${stats.inshoreBoatsSpotted.size} unique boats, rate=${stats.inshoreStateRate}/sec, avg decode=${avgLatency.toFixed(1)}ms`);
+          }
         } catch (err) {
-          wsLog.error(`Inshore state decode failed (size=${data?.size ?? '?'}): ${err.message}`);
+          stats.inshoreStateErrors++;
+          wsLog.error(`State decode failed #${stats.inshoreStateErrors} (size=${data?.size ?? '?'}): ${err.message}`);
+          // Log decode error rate
+          if (stats.inshoreStateErrors <= 5 || stats.inshoreStateErrors % 100 === 0) {
+            wsLog.warn(`Decode error rate: ${stats.inshoreStateErrors}/${stats.inshoreStateDecodes + stats.inshoreStateErrors} (${((stats.inshoreStateErrors / (stats.inshoreStateDecodes + stats.inshoreStateErrors)) * 100).toFixed(1)}%)`);
+          }
         }
       } else {
-        wsLog.debug(`WS state update (size=${data?.size ?? '?'}) — no base64 data`, { direction });
+        wsLog.debug(`State update without base64 (size=${data?.size ?? '?'})`, { direction });
       }
       break;
 

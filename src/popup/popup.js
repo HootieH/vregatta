@@ -235,6 +235,32 @@ function fetchDebugStats() {
       rawBtn.textContent = rawCaptureActive ? 'Disable Raw Capture' : 'Enable Raw Capture';
       rawBtn.classList.toggle('active', rawCaptureActive);
     }
+
+    // Inshore telemetry
+    const inshore = response.inshore;
+    const inshoreSection = document.getElementById('dbg-inshore-section');
+    if (inshore && inshoreSection) {
+      inshoreSection.classList.toggle('hidden', inshore.stateDecodes === 0 && inshore.connections.length === 0);
+      setText('dbg-in-decodes', String(inshore.stateDecodes));
+      setText('dbg-in-errors', String(inshore.stateErrors));
+      setText('dbg-in-rate', String(inshore.stateRate));
+      setText('dbg-in-latency', inshore.avgDecodeLatencyMs);
+      setText('dbg-in-boats', `${inshore.boatsSpotted} (slots: ${inshore.boatSlots.join(',')})`);
+      setText('dbg-in-helms', String(inshore.helmInputs));
+      setText('dbg-in-master', String(inshore.masterDecodes));
+      setText('dbg-in-conns', String(inshore.connections.length));
+
+      const slotsEl = document.getElementById('dbg-in-slots');
+      if (slotsEl && inshore.connections.length > 0) {
+        slotsEl.textContent = inshore.connections.map(u => u.includes('Master') ? 'Master' : u.includes('Game') ? 'Game' : 'Other').join(' + ');
+      }
+
+      // Color decode errors red if any
+      const errEl = document.getElementById('dbg-in-errors');
+      if (errEl) {
+        errEl.style.color = inshore.stateErrors > 0 ? '#e74c3c' : '#e0e0e0';
+      }
+    }
   });
 }
 
